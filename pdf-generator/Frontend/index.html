@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>S3 PDF Portal</title>
+    <style>
+        body { font-family: sans-serif; max-width: 500px; margin: 50px auto; line-height: 1.6; }
+        input, button { display: block; width: 100%; margin: 10px 0; padding: 10px; }
+        #status { color: #2c3e50; font-weight: bold; margin-top: 20px; padding: 10px; border-radius: 5px; }
+        .success { color: #27ae60; }
+        .error { color: #c0392b; }
+    </style>
+</head>
+<body>
+    <h2>PDF Generator Portal</h2>
+
+    <!-- Auth Section -->
+    <div id="auth-section">
+        <input type="text" id="username" placeholder="Username">
+        <input type="password" id="password" placeholder="Password">
+        <button onclick="handleRegister()">1. Register</button>
+        <button onclick="handleLogin()" style="background: #e0e0e0;">2. Login</button>
+    </div>
+
+    <!-- Main Section -->
+    <div id="main-section" style="display:none">
+        <p>Logged in as: <span id="display-user" style="font-weight: bold;"></span></p>
+        <input type="text" id="pdfContent" placeholder="Enter PDF Content (e.g. Hello World)">
+        <button onclick="requestJob()" style="background: #4CAF50; color: white;">3. Generate & Download PDF</button>
+        <div id="status"></div>
+    </div>
+
+    <script>
+        const API_URL = "http://localhost:8080";
+        let token = "";
+
+        async function handleRegister() {
+            const u = document.getElementById('username').value;
+            const p = document.getElementById('password').value;
+            const res = await fetch(`${API_URL}/register?username=${encodeURIComponent(u)}&password=${encodeURIComponent(p)}`, {
+                method: 'POST'
+            });
+
+            if (res.ok) {
+                alert("Registration Successful! Now click Login.");
+            } else {
+                const data = await res.json();
+                alert("Registration Failed: " + (data.detail || "Unknown error"));
+            }
+        }
+
+        async function handleLogin() {
+            const u = document.getElementById('username').value;
+            const p = document.getElementById('password').value;
+            const params = new URLSearchParams();
+            params.append('username', u);
+            params.append('password', p);
+
+            const res = await fetch(`${API_URL}/token`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: params
+            });
+
+            const data = await res.json();
+
+            if (res.ok && data.access_token) {
+                token = data.access_token;
+                document.getElementById('auth-section').style.display = 'none';
+                document.getElementById('main-section').style.display = 'block';
+                document.getElementById('display-user').innerText = u;
+            } else {
+                alert("Login failed: " + (data.detail || "Check credentials"));
+            }
+        }
+
+        async function requestJob() {
+            const content = document.getElementById('pdfContent').value;
+            const statusDiv = document.getElementById('status');
+
+            if (!content) {
+                alert("Please enter some content");
+                return;
+            }
+
+            statusDiv.innerText = "⏳ Sending job to queue...";
+            statusDiv.className = "";
+
+            try {
+                // 1. Submit the Job
+                const res = await fetch(`${API_URL}/jobs`, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        action: "generate_pdf",
+                        params: { text: content }
+                    })
+                });
+
+                if (!res.ok) throw new Error("Failed to submit job");
+
+                const { job_id } = await res.json();
+
+                // 2. Poll for Status every 2 seconds
+                const interval = setInterval(async () => {
+                    const statusRes = await fetch(`${API_URL}/jobs/${job_id}`, {
+                        headers: { 'Authorization': `Bearer ${token}` }
+                    });
+                    const jobData = await statusRes.json();
+
+                    if (jobData.status === 'completed' && jobData.download_url) {
+                        clearInterval(interval);
+                        statusDiv.innerHTML = `<a href="${jobData.download_url}" target="_blank" class="success">✅ PDF Ready! Click here to download if it didn't start automatically.</a>`;
+                        window.location.href = jobData.download_url; // Auto-trigger download
+                    } else if (jobData.status === 'failed') {
+                        clearInterval(interval);
+                        statusDiv.innerText = "❌ Job failed in worker. Check logs.";
+                        statusDiv.className = "error";
+                    } else {
+                        statusDiv.innerText = `🔄 Status: ${jobData.status}...`;
+                    }
+                }, 2000);
+
+            } catch (err) {
+                statusDiv.innerText = "❌ Error: " + err.message;
+                statusDiv.className = "error";
+            }
+        }
+    </script>
+</body>
+</html>
