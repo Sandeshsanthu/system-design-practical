@@ -3,14 +3,12 @@ version: '3.8'
 services:
   # The FastAPI Application
   app:
-    build: .
+    image: sandeshs/pdf-generator:latest
     container_name: fastapi_app
     ports:
       - "8080:8080"
     environment:
-      # Link to the 'db' service defined below
       - DATABASE_URL=postgresql://user:password@db:5432/mydatabase
-      # Link to the 'cache' service defined below
       - REDIS_HOST=cache
       - REDIS_PORT=6379
     depends_on:
@@ -20,7 +18,7 @@ services:
         condition: service_started
 
   worker:
-    build: .
+    image: sandeshs/pdf-generator:latest
     container_name: pdf_worker
     command: python -u worker.py
     env_file:
