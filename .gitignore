@@ -38,3 +38,31 @@ wheels/
 # Docker
 .dockerignore
 '@ | Out-File -FilePath .gitignore -Encoding utf8
+
+
+
+# Local .terraform folder
+**/.terraform/*
+
+# .tfstate files
+*.tfstate
+*.tfstate.*
+
+# Crash logs
+crash.log
+crash.*.log
+
+# Exclude vars files (contain secrets)
+*.tfvars
+*.tfvars.json
+
+# Override files
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+
+# CLI configuration files
+.terraformrc
+terraform.rc
+

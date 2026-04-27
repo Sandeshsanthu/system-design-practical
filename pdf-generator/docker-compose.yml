@@ -27,6 +27,9 @@ services:
       - PYTHONUNBUFFERED=1
       - REDIS_HOST=cache
       - REDIS_PORT=6379
+      - BUCKET_NAME=pdf-generator-sandesh
+      - AWS_DEFAULT_REGION=us-east-1
+      - DATABASE_URL=postgresql://user:password@db:5432/mydatabase
     depends_on:
       db:
         condition: service_healthy
