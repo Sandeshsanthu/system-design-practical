@@ -34,5 +34,5 @@ variable "db_name" {
 variable "s3_bucket_name" {
   description = "this is s3 bucket name"
   type = string
-  default = "pdf-generator-sandesh"
+  default = "pdf-generator-sandeshgowda"
 }

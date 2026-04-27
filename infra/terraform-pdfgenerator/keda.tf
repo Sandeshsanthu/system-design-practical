@@ -36,20 +36,18 @@ resource "helm_release" "external_secrets" {
   create_namespace = true
   version          = "0.9.9"
 
-  set {
-    name  = "installCRDs"
-    value = "true"
-  }
-
-  set {
-    name  = "serviceAccount.annotations.eks\\.amazonaws\\.com/role-arn"
-    value = aws_iam_role.external_secrets.arn
-  }
-
-  set {
-    name  = "serviceAccount.name"
-    value = "external-secrets-sa"
-  }
+  values = [
+    yamlencode({
+      installCRDs = true
+      serviceAccount = {
+        name = "external-secrets-sa"
+        annotations = {
+          "://amazonaws.com" = aws_iam_role.external_secrets.arn
+        }
+      }
+    })
+  ]
 
   depends_on = [module.eks]
 }
+

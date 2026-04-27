@@ -42,7 +42,7 @@ module "eks" {
     taints = [{
         key    = "workload"
         value  = "worker"
-        effect = "NoSchedule"
+        effect = "NO_SCHEDULE"
       }]
      tags = {
         NodeGroup = "workers"
