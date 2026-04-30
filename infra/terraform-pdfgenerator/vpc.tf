@@ -18,10 +18,12 @@ enable_dns_support   = true
 
   public_subnet_tags = {
     "kubernetes.io/role/elb" = 1
+    "kubernetes.io/cluster/${var.cluster_name}"   = "owned"
   }
 
   private_subnet_tags = {
     "kubernetes.io/role/internal-elb" = 1
+     "kubernetes.io/cluster/${var.cluster_name}"   = "owned"
   }
 
   tags = {

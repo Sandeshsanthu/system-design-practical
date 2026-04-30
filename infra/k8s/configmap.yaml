@@ -5,7 +5,7 @@ metadata:
   name: app-config
   namespace: pdf-generator
 data:
-  REDIS_HOST: "your-redis-endpoint.cache.amazonaws.com"  # Update from Terraform output
+  REDIS_HOST: "pdf-generator-cluster-redis-001.pdf-generator-cluster-redis.dil7md.use1.cache.amazonaws.com"  # Update from Terraform output
   REDIS_PORT: "6379"
   AWS_DEFAULT_REGION: "us-east-1"
   BUCKET_NAME: "pdf-generator-sandesh"

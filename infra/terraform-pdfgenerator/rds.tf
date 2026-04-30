@@ -58,8 +58,8 @@ module "db" {
 
   # Maintenance & Backups
   backup_retention_period = 7
-  skip_final_snapshot     = false
-  deletion_protection     = true
+  skip_final_snapshot     = true
+  deletion_protection     = false
 
   enabled_cloudwatch_logs_exports = ["postgresql", "upgrade"]
 

@@ -5,7 +5,7 @@ metadata:
   name: worker-sa
   namespace: pdf-generator
   annotations:
-    eks.amazonaws.com/role-arn: arn:aws:iam::ACCOUNT_ID:role/pdf-generator-cluster-worker-role  # Update from Terraform output
+    eks.amazonaws.com/role-arn: arn:aws:iam::667383782466:role/pdf-generator-cluster-worker-role  # Update from Terraform output
 ---
 apiVersion: apps/v1
 kind: Deployment
