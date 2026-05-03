@@ -1,38 +1,23 @@
-variable "aws_region" {
-  description = "aws region"
-  type        = string
-  default     = "us-east-1"
-
+variable "region" {
+  default = "us-east-1"
 }
 
+variable "vpc_cidr" {
+  default = "10.0.0.0/16"
+}
+
+variable "eks_node_sg_id" {
+  description = "The Security Group ID of your EKS worker nodes"
+  type        = string
+}
+
+variable "external_ip" {
+  description = "Your local/app IP (e.g., 1.2.3.4/32)"
+  type        = string
+  default = "0.0.0.0/0"
+}
 variable "cluster_name" {
-  description = "cluster name"
+  description = "The name of your existing EKS cluster"
   type        = string
-  default     = "pdf"
-
-}
-
-variable "environment" {
-  description = "env name"
-  type        = string
-  default     = "production"
-}
-
-variable "db_username" {
-  description = "database username"
-  type        = string
-  default     = "dbadmin"
-
-}
-
-variable "db_name" {
-  description = "database-name"
-  type        = string
-  default     = "mydatabase"
-}
-
-variable "s3_bucket_name" {
-  description = "this is s3 bucket name"
-  type        = string
-  default     = "pdf-generator-sandeshgowda"
+  default     = "my-eks-cluster" # Change this to your actual cluster name
 }

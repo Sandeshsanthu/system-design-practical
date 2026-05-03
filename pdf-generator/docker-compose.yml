@@ -8,14 +8,12 @@ services:
     ports:
       - "8080:8080"
     environment:
-      - DATABASE_URL=postgresql://user:password@db:5432/mydatabase
-      - REDIS_HOST=cache
+      # - DATABASE_URL=postgresql://user:password@db:5432/mydatabase
+      - DATABASE_URL=postgresql://dbadmin:CMI)E0(g]0Uc!FaMw9Oz@prod-postgres.cydmkoy6etoi.us-east-1.rds.amazonaws.com:5432/production_db
+      - REDIS_HOST=master.pdf-gen-redis-public.dil7md.use1.cache.amazonaws.com
       - REDIS_PORT=6379
-    depends_on:
-      db:
-        condition: service_healthy
-      cache:
-        condition: service_started
+      - REDIS_PASS=f8t8k3JCKwVQPbYxZjzcIFpulPVaE0zK
+
 
   worker:
     image: sandeshs/pdf-generator:latest
@@ -25,44 +23,10 @@ services:
       - .env
     environment:
       - PYTHONUNBUFFERED=1
-      - REDIS_HOST=cache
+      - REDIS_HOST=master.pdf-gen-redis-public.dil7md.use1.cache.amazonaws.com
       - REDIS_PORT=6379
+      - REDIS_PASS=f8t8k3JCKwVQPbYxZjzcIFpulPVaE0zK
       - BUCKET_NAME=pdf-generator-sandesh
       - AWS_DEFAULT_REGION=us-east-1
-      - DATABASE_URL=postgresql://user:password@db:5432/mydatabase
-    depends_on:
-      db:
-        condition: service_healthy
-      cache:
-        condition: service_started
+      - DATABASE_URL=postgresql://dbadmin:CMI)E0(g]0Uc!FaMw9Oz@prod-postgres.cydmkoy6etoi.us-east-1.rds.amazonaws.com:5432/production_db
 
-  # PostgreSQL Database
-  db:
-    image: postgres:15-alpine
-    container_name: postgres_db
-    environment:
-      - POSTGRES_USER=user
-      - POSTGRES_PASSWORD=password
-      - POSTGRES_DB=mydatabase
-    ports:
-      - "5432:5432"
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U user -d mydatabase"]
-      interval: 5s
-      timeout: 5s
-      retries: 5
-
-  # Redis Queue
-  cache:
-    image: redis:7-alpine
-    container_name: redis_cache
-    ports:
-      - "6379:6379"
-    volumes:
-      - redis_data:/data
-
-volumes:
-  postgres_data:
-  redis_data:
