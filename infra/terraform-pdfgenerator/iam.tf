@@ -18,7 +18,10 @@ resource "aws_iam_policy" "secrets_policy" {
     Version = "2012-10-17"
     Statement = [
       {
-        Action   = "secretsmanager:GetSecretValue"
+        Action = [
+          "secretsmanager:GetSecretValue",
+          "secretsmanager:DescribeSecret"
+        ]
         Effect   = "Allow"
         Resource = "arn:aws:secretsmanager:${var.region}:${data.aws_caller_identity.current.account_id}:secret:prod/db/postgres-credentials-v-*"
       }
