@@ -6,7 +6,7 @@ resource "random_password" "db_pass" {
 }
 
 resource "aws_secretsmanager_secret" "db_secret" {
-  name        = "prod/db/postgres-credentials"
+  name        = "prod/db/postgres-credentials-v"
   description = "RDS Postgres credentials"
 }
 

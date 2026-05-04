@@ -34,6 +34,8 @@ resource "aws_db_instance" "postgres" {
   db_name               = "production_db"
   username              = "dbadmin"
   password              = random_password.db_pass.result
+  skip_final_snapshot = true
+  deletion_protection = false
   db_subnet_group_name  = aws_db_subnet_group.database.name
   vpc_security_group_ids = [aws_security_group.rds_sg.id]
   publicly_accessible   = true 

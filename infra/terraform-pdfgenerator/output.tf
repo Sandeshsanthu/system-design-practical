@@ -26,13 +26,5 @@ output "docker_database_url" {
   sensitive   = true
 }
 
-output "redis_host" {
-  value = aws_elasticache_replication_group.redis.primary_endpoint_address
-}
-
-output "redis_password" {
-  value     = random_password.redis_password.result
-  sensitive = true
-}
 
 

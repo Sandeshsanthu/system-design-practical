@@ -46,8 +46,30 @@ resource "aws_db_subnet_group" "database" {
   subnet_ids = [aws_subnet.subnet_a.id, aws_subnet.subnet_b.id]
 }
 
-# NEW: Subnet Group for Redis (ElastiCache)
-resource "aws_elasticache_subnet_group" "redis_subnet_group" {
-  name       = "redis-vpc-subnet-group"
-  subnet_ids = [aws_subnet.subnet_a.id, aws_subnet.subnet_b.id]
+
+#kuberenetes code
+
+module "vpc" {
+  source  = "terraform-aws-modules/vpc/aws"
+  version = "~> 5.0"
+
+  name = "${var.cluster_name}-vpc"
+  cidr = var.vpc_cidr
+
+  azs             = ["${var.region}a", "${var.region}b"]
+  private_subnets = ["10.0.1.0/24", "10.0.2.0/24"]
+  public_subnets  = ["10.0.101.0/24", "10.0.102.0/24"]
+
+  enable_nat_gateway   = true
+  single_nat_gateway   = false # High Availability: NAT per AZ
+  enable_dns_hostnames = true
+
+  public_subnet_tags = {
+    "kubernetes.io/role/elb" = 1 # Required for Public Load Balancers
+  }
+  private_subnet_tags = {
+    "kubernetes.io/role/internal-elb" = 1 # Required for Internal Load Balancers
+  }
 }
+
+

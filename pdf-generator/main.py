@@ -18,14 +18,7 @@ SECRET_KEY = "DEV_SECRET_KEY"  # In production, use a strong random secret
 ALGORITHM = "HS256"
 
 # --- Setup ---
-redis_client = redis.Redis(
-    host=REDIS_HOST,
-    port=6379,
-    password=REDIS_PASS,  # Use only password for Standard clusters
-    ssl=True,             # Required for ElastiCache
-    ssl_cert_reqs=None,
-    decode_responses=True # For the worker
-)
+redis_client = redis.Redis(host=REDIS_HOST, port=REDIS_PORT, db=0)
 engine = create_engine(DATABASE_URL)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
