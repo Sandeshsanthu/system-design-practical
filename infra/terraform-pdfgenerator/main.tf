@@ -61,8 +61,8 @@ module "eks" {
     production = {
       instance_types = ["t3.small"]
       min_size       = 1
-      max_size       = 2
-      desired_size   = 1
+      max_size       = 4
+      desired_size   = 3
       subnet_ids     = module.vpc.private_subnets
       ami_type       = "AL2023_x86_64_STANDARD"
     }

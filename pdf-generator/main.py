@@ -17,6 +17,9 @@ REDIS_PASS = os.getenv("REDIS_PASS")
 SECRET_KEY = "DEV_SECRET_KEY"  # In production, use a strong random secret
 ALGORITHM = "HS256"
 
+QUEUE_NAME = "job_queue"
+MAX_RETRIES = 3
+
 # --- Setup ---
 redis_client = redis.Redis(host=REDIS_HOST, port=REDIS_PORT, db=0)
 engine = create_engine(DATABASE_URL)
@@ -126,9 +129,12 @@ def create_job(request: JobRequest, current_user: User = Depends(get_current_use
 
         job_payload = {
             "job_id": job_id,
-            "data": request.dict()
+            "data": request.dict(),
+            "retry_count": 0,
+            "max_retries": MAX_RETRIES,
+            "last_error": None
         }
-        redis_client.rpush("job_queue", json.dumps(job_payload))
+        redis_client.lpush(QUEUE_NAME, json.dumps(job_payload))
         return {"job_id": job_id, "status": "pending"}
     except Exception as e:
         db.rollback()

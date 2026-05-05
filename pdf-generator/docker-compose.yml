@@ -3,7 +3,7 @@ version: '3.8'
 services:
   # The FastAPI Application
   app:
-    image: sandeshs/pdf-generator:v4
+    image: sandeshs/pdf-generator:fixed-v3
     container_name: fastapi_app
     ports:
       - "8080:8080"
@@ -18,7 +18,7 @@ services:
         condition: service_started
 
   worker:
-    image: sandeshs/pdf-generator:v4
+    image: sandeshs/pdf-generator:fixed-v3
     container_name: pdf_worker
     command: python -u worker.py
     env_file:
