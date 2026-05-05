@@ -1,31 +1,52 @@
-apiVersion: v1
-kind: Service
-metadata:
-  name: redis-service
-  namespace: pdf-gen
-spec:
-  selector:
-    app: redis
-  ports:
-    - port: 6379
----
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: redis
+  name: cache
   namespace: pdf-gen
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: redis
+      app: cache
   template:
     metadata:
       labels:
-        app: redis
+        app: cache
     spec:
       containers:
-      - name: redis
-        image: redis:7-alpine
-        ports:
-        - containerPort: 6379
+        - name: redis
+          image: redis:7-alpine
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 6379
+          volumeMounts:
+            - name: redis-data
+              mountPath: /data
+          readinessProbe:
+            tcpSocket:
+              port: 6379
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            tcpSocket:
+              port: 6379
+            initialDelaySeconds: 15
+            periodSeconds: 20
+      volumes:
+        - name: redis-data
+          emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: cache
+  namespace: pdf-gen
+spec:
+  selector:
+    app: cache
+  ports:
+    - name: redis
+      port: 6379
+      targetPort: 6379
+  type: ClusterIP
+---

@@ -1,0 +1,36 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: pdf-worker
+  namespace: pdf-gen
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: pdf-worker
+  template:
+    metadata:
+      labels:
+        app: pdf-worker
+    spec:
+      # Using the merged ServiceAccount
+      serviceAccountName: pdf-gen-sa
+      containers:
+        - name: worker
+          image: sandeshs/pdf-generator:latest
+          imagePullPolicy: Always
+          command: ["python", "-u", "worker.py"]
+          envFrom:
+            - secretRef:
+                name: pdf-generator-env
+          env:
+            - name: PYTHONUNBUFFERED
+              value: "1"
+          # SRE Tip: Workers should at least have a liveness check
+          # to ensure the process hasn't hung
+          livenessProbe:
+            exec:
+              command: ["pgrep", "-f", "worker.py"]
+            initialDelaySeconds: 30
+            periodSeconds: 60

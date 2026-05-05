@@ -9,7 +9,7 @@ services:
       - "8080:8080"
     environment:
       # - DATABASE_URL=postgresql://user:password@db:5432/mydatabase
-      - DATABASE_URL=postgresql://dbadmin:mwA#7))#>UB99fO34j?U@prod-postgres.cydmkoy6etoi.us-east-1.rds.amazonaws.com:5432/production_db
+      - DATABASE_URL=
       - REDIS_HOST=cache
       - REDIS_PORT=6379
     depends_on:
@@ -30,7 +30,7 @@ services:
       - REDIS_PORT=6379
       - BUCKET_NAME=pdf-generator-sandesh
       - AWS_DEFAULT_REGION=us-east-1
-      - DATABASE_URL=postgresql://dbadmin:mwA#7))#>UB99fO34j?U@prod-postgres.cydmkoy6etoi.us-east-1.rds.amazonaws.com:5432/production_db
+      - DATABASE_URL=
     depends_on:
       # db:
       #   condition: service_healthy

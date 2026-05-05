@@ -1,0 +1,8 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: pdf-gen-sa
+  namespace: pdf-gen
+  annotations:
+    # This single role must have permissions for both App and Worker tasks
+    eks.amazonaws.com/role-arn: arn:aws:iam::667383782466:role/eks-pdf-gen-pdf-app-role
