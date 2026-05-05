@@ -45,6 +45,13 @@ module "eks" {
 
   enable_irsa = true
 
+  cluster_addons = {
+    aws-ebs-csi-driver = {
+      most_recent              = true
+      service_account_role_arn = module.ebs_csi_irsa.iam_role_arn
+    }
+  }
+
   create_kms_key = true
   cluster_encryption_config = {
     resources = ["secrets"]

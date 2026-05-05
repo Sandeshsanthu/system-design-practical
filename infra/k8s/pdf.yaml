@@ -14,10 +14,10 @@ spec:
         app: pdf-app
     spec:
       # Using the merged ServiceAccount
-      serviceAccountName: pdf-gen-sa
+      serviceAccountName: pdf-worker-sa
       containers:
         - name: app
-          image: sandeshs/pdf-generator:latest
+          image: sandeshs/pdf-generator:fixed-v2
           imagePullPolicy: Always
           ports:
             - containerPort: 8080

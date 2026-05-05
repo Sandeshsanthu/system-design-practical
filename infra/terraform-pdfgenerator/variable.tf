@@ -20,7 +20,7 @@ variable "vpc_cidr" {
 variable "pdf_bucket_name" {
   description = "S3 bucket used by the app"
   type        = string
-  default     = "pdf-generator-sandesh"
+  default     = "pdf-generator-sandeshs"
 }
 
 variable "db_instance_class" {

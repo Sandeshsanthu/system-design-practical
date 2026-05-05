@@ -15,10 +15,10 @@ spec:
         app: pdf-worker
     spec:
       # Using the merged ServiceAccount
-      serviceAccountName: pdf-gen-sa
+      serviceAccountName: pdf-worker-sa
       containers:
         - name: worker
-          image: sandeshs/pdf-generator:latest
+          image: sandeshs/pdf-generator:fixed-v2
           imagePullPolicy: Always
           command: ["python", "-u", "worker.py"]
           envFrom:

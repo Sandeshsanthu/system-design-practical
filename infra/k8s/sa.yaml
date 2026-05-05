@@ -1,7 +1,7 @@
 apiVersion: v1
 kind: ServiceAccount
 metadata:
-  name: pdf-gen-sa
+  name: pdf-worker-sa
   namespace: pdf-gen
   annotations:
     # This single role must have permissions for both App and Worker tasks
