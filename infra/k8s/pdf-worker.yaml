@@ -18,7 +18,7 @@ spec:
       serviceAccountName: pdf-worker-sa
       containers:
         - name: worker
-          image: sandeshs/pdf-generator:fixed-v2
+          image: sandeshs/pdf-generator:fixed-v3
           imagePullPolicy: Always
           command: ["python", "-u", "worker.py"]
           envFrom:
@@ -27,6 +27,8 @@ spec:
           env:
             - name: PYTHONUNBUFFERED
               value: "1"
+            - name: REDIS_HOST        # <--- Add this
+              value: "cache-headless"
           # SRE Tip: Workers should at least have a liveness check
           # to ensure the process hasn't hung
           livenessProbe:

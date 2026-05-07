@@ -1,0 +1,18 @@
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata:
+  name: pdf-worker-scaler
+  namespace: pdf-gen
+spec:
+  scaleTargetRef:
+    name: pdf-worker # Must match your Deployment name
+  minReplicaCount: 1  # Can scale to zero if queue is empty
+  maxReplicaCount: 10 # Upper limit
+  triggers:
+    - type: redis
+      metadata:
+        # Use the service name we fixed earlier
+        host: cache-headless.pdf-gen.svc.cluster.local
+        port: "6379"
+        listName: "pdf_tasks" # The name of the list your app pushes to
+        listLength: "5"       # Scale out 1 pod for every 5 items in the queue

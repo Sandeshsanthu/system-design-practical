@@ -1,0 +1,22 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: load-generator
+  namespace: pdf-gen
+spec:
+  template:
+    spec:
+      containers:
+      - name: worker
+        image: python:3.11
+        command: ["/bin/bash", "-c"]
+        args: ["pip install redis && python /mnt/flood.py"]
+        volumeMounts:
+        - name: script-vol
+          mountPath: /mnt
+      volumes:
+      - name: script-vol
+        configMap:
+          name: load-gen-script
+      restartPolicy: Never
+  backoffLimit: 0

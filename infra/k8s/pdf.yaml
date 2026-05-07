@@ -17,13 +17,16 @@ spec:
       serviceAccountName: pdf-worker-sa
       containers:
         - name: app
-          image: sandeshs/pdf-generator:fixed-v2
+          image: sandeshs/pdf-generator:fixed-v3
           imagePullPolicy: Always
           ports:
             - containerPort: 8080
           envFrom:
             - secretRef:
                 name: pdf-generator-env
+          env:
+            - name: REDIS_HOST        # <--- Add this
+              value: "cache-headless" # <--- Add this
           readinessProbe:
             tcpSocket:
               port: 8080
