@@ -1,4 +1,3 @@
----
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -14,23 +13,41 @@ spec:
       labels:
         app: pdf-worker
     spec:
-      # Using the merged ServiceAccount
       serviceAccountName: pdf-worker-sa
+      
+      # 🚀 KARPENTER TIP: Spread workers across different nodes/AZs
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: "kubernetes.io/hostname"
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector:
+            matchLabels:
+              app: pdf-worker
+
       containers:
         - name: worker
           image: sandeshs/pdf-generator:fixed-v3
           imagePullPolicy: Always
           command: ["python", "-u", "worker.py"]
+          
+          # 🚀 KARPENTER TIP: Mandatory for scaling logic
+          resources:
+            requests:
+              cpu: "250m"      # Reserved capacity on the node
+              memory: "512Mi"
+            limits:
+              cpu: "500m"      # Hard cap
+              memory: "1Gi"
+
           envFrom:
             - secretRef:
                 name: pdf-generator-env
           env:
             - name: PYTHONUNBUFFERED
               value: "1"
-            - name: REDIS_HOST        # <--- Add this
+            - name: REDIS_HOST
               value: "cache-headless"
-          # SRE Tip: Workers should at least have a liveness check
-          # to ensure the process hasn't hung
+
           livenessProbe:
             exec:
               command: ["pgrep", "-f", "worker.py"]

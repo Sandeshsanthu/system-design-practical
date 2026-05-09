@@ -27,6 +27,7 @@ module "vpc" {
   private_subnet_tags = {
     "kubernetes.io/role/internal-elb"         = "1"
     "kubernetes.io/cluster/${var.cluster_name}" = "shared"
+    "karpenter.sh/discovery"                    = var.cluster_name
   }
 }
 
@@ -43,6 +44,8 @@ module "eks" {
   cluster_endpoint_public_access  = true
   cluster_endpoint_private_access = true
 
+
+
   enable_irsa = true
 
   cluster_addons = {
@@ -58,13 +61,19 @@ module "eks" {
   }
 
   eks_managed_node_groups = {
-    production = {
-      instance_types = ["t3.small"]
+    # production = {
+    #   instance_types = ["t3.small"]
+    #   min_size       = 1
+    #   max_size       = 4
+    #   desired_size   = 3
+    #   subnet_ids     = module.vpc.private_subnets
+    #   ami_type       = "AL2023_x86_64_STANDARD"
+    # }
+    karpenter_system = {
+      instance_types = ["t3.medium"]
       min_size       = 1
-      max_size       = 4
-      desired_size   = 3
-      subnet_ids     = module.vpc.private_subnets
-      ami_type       = "AL2023_x86_64_STANDARD"
+      max_size       = 2
+      desired_size   = 1
     }
   }
 
@@ -181,3 +190,87 @@ module "worker_irsa" {
     s3_access      = aws_iam_policy.s3_policy.arn
   }
 }
+module "karpenter" {
+  source  = "terraform-aws-modules/eks/aws//modules/karpenter"
+  version = "~> 20.0"
+
+  cluster_name = module.eks.cluster_name
+
+  enable_v1_permissions = true
+
+  # Grant access to the Node IAM Role
+  node_iam_role_additional_policies = {
+    AmazonSSMManagedInstanceCore = "arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore"
+  }
+}
+
+resource "aws_iam_role_policy" "karpenter_controller_extra" {
+  name = "KarpenterControllerExtra"
+  role = module.karpenter_irsa.iam_role_name
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Action = [
+          "iam:CreateInstanceProfile",
+          "iam:GetInstanceProfile",
+          "iam:DeleteInstanceProfile",
+          "iam:AddRoleToInstanceProfile",
+          "iam:RemoveRoleFromInstanceProfile",
+          "iam:TagInstanceProfile",
+          "iam:PassRole"
+        ]
+        Effect   = "Allow"
+        Resource = "*"
+      },
+      {
+        # Permissions to allow EC2 to actually launch instances using the templates
+        Action = [
+          "ec2:RunInstances",
+          "ec2:CreateFleet",
+          "ec2:CreateLaunchTemplate",
+          "ec2:DeleteLaunchTemplate",
+          "ec2:DescribeLaunchTemplates",
+          "ec2:DescribeImages",
+          "ec2:DescribeInstances",
+          "ec2:DescribeSecurityGroups",
+          "ec2:DescribeSubnets",
+          "ec2:DescribeInstanceTypes",
+          "ec2:DescribeInstanceTypeOfferings",
+          "ec2:DescribeAvailabilityZones",
+          "ec2:DescribeSpotPriceHistory",
+          "ssm:GetParameter"
+        ]
+        Effect   = "Allow"
+        Resource = "*"
+      }
+    ]
+  })
+}
+
+module "karpenter_irsa" {
+  source  = "terraform-aws-modules/iam/aws//modules/iam-role-for-service-accounts-eks"
+  version = "~> 5.0"
+
+  role_name                          = "KarpenterController-${var.cluster_name}"
+  attach_karpenter_controller_policy = true
+
+  karpenter_controller_cluster_name       = module.eks.cluster_name
+  karpenter_controller_node_iam_role_arns = [module.karpenter.node_iam_role_arn]
+
+  oidc_providers = {
+    main = {
+      provider_arn               = module.eks.oidc_provider_arn
+      namespace_service_accounts = ["kube-system:karpenter"]
+    }
+  }
+}
+
+resource "aws_ec2_tag" "cluster_primary_security_group" {
+  resource_id = module.eks.cluster_primary_security_group_id
+  key         = "karpenter.sh/discovery"
+  value       = var.cluster_name
+}
+
+

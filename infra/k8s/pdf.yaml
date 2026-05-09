@@ -4,7 +4,7 @@ metadata:
   name: pdf-app
   namespace: pdf-gen
 spec:
-  replicas: 1
+  replicas: 2 # 🚀 Recommendation: Start with 2 for High Availability
   selector:
     matchLabels:
       app: pdf-app
@@ -13,20 +13,40 @@ spec:
       labels:
         app: pdf-app
     spec:
-      # Using the merged ServiceAccount
       serviceAccountName: pdf-worker-sa
+
+      # 🚀 KARPENTER TIP: Ensure API pods stay in different Availability Zones
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: "topology.kubernetes.io/zone"
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector:
+            matchLabels:
+              app: pdf-app
+
       containers:
         - name: app
           image: sandeshs/pdf-generator:fixed-v3
           imagePullPolicy: Always
           ports:
             - containerPort: 8080
+
+          # 🚀 KARPENTER TIP: Essential for node selection
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "256Mi"
+            limits:
+              cpu: "300m"
+              memory: "512Mi"
+
           envFrom:
             - secretRef:
                 name: pdf-generator-env
           env:
-            - name: REDIS_HOST        # <--- Add this
-              value: "cache-headless" # <--- Add this
+            - name: REDIS_HOST
+              value: "cache-headless"
+
           readinessProbe:
             tcpSocket:
               port: 8080
@@ -43,6 +63,9 @@ kind: Service
 metadata:
   name: pdf-app
   namespace: pdf-gen
+  annotations:
+    # 🚀 AWS TIP: Use the modern NLB instead of old CLB
+    service.beta.kubernetes.io/aws-load-balancer-type: "nlb"
 spec:
   selector:
     app: pdf-app
@@ -51,4 +74,3 @@ spec:
       port: 80
       targetPort: 8080
   type: LoadBalancer
-
