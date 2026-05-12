@@ -6,7 +6,7 @@ metadata:
   namespace: kube-system
   annotations:
     # This is the "Manager" role that allows the pod to talk to AWS
-    eks.amazonaws.com/role-arn: arn:aws:iam::667383782466:role/KarpenterController-20260509071349834900000005
+    eks.amazonaws.com/role-arn: arn:aws:iam::667383782466:role/KarpenterController-eks-pdf-gen
 ---
 # 2. The Scaling Rules
 apiVersion: karpenter.sh/v1
@@ -41,7 +41,7 @@ metadata:
   name: default
 spec:
   amiFamily: AL2023
-  role: "Karpenter-eks-pdf-gen-20260509072226230300000019"
+  role: "Karpenter-eks-pdf-gen-20260512122835922300000016"
   subnetSelectorTerms:
     - tags:
         # Use the discovery tag you added in the VPC module
