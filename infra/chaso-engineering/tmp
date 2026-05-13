@@ -1,0 +1,3 @@
+PS C:\Users\sandeshs\system-design-practical\infra\chaso-engineering> kubectl create configmap load-gen-script --from-file=flood.py -n pdf-gen
+configmap/load-gen-script created
+PS C:\Users\sandeshs\system-design-practical\infra\chaso-engineering> kubectl get configmap load-gen-script -n pdf-gen

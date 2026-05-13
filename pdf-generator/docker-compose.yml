@@ -11,7 +11,7 @@ services:
       - DATABASE_URL=postgresql://user:password@db:5432/mydatabase
       - REDIS_HOST=cache
       - REDIS_PORT=6379
-    depends_on:
+    depends_on: 
       db:
         condition: service_healthy
       cache:

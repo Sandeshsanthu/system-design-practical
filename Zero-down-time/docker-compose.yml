@@ -1,0 +1,44 @@
+version: '3.8'
+
+services:
+  pg_old:
+    image: postgres:15-alpine
+    container_name: pg_old
+    environment:
+      POSTGRES_USER: app_user
+      POSTGRES_PASSWORD: SecretPassword123
+      POSTGRES_DB: prod_db
+    command: ["postgres", "-c", "wal_level=logical", "-c", "max_replication_slots=5"]
+    ports:
+      - "5431:5432"
+
+  pg_new:
+    image: postgres:17-alpine
+    container_name: pg_new
+    environment:
+      POSTGRES_USER: app_user
+      POSTGRES_PASSWORD: SecretPassword123
+      POSTGRES_DB: prod_db
+    ports:
+      - "5432:5432"
+
+
+  pgbouncer:
+    image: edoburu/pgbouncer:latest
+    container_name: pgbouncer
+    ports:
+      - "6432:6432"
+    volumes:
+      - ./pgbouncer:/etc/pgbouncer:rw
+
+
+  app:
+    image: python:3.11-alpine
+    container_name: sample_app
+    depends_on:
+      - pgbouncer
+    volumes:
+      - ./app:/app
+    working_dir: /app
+    command: sh -c "pip install psycopg2-binary && python app.py"
+

@@ -8,10 +8,6 @@ helm repo add grafana https://grafana.github.io/helm-charts
 helm repo update
 
 
-helm upgrade --install loki grafana/loki-stack `
-  --namespace monitoring `
-  --set promtail.enabled=true `
-  --set loki.persistence.enabled=false
 
 
 helm repo add kedacore https://kedacore.github.io/charts
@@ -32,7 +28,7 @@ helm repo update
 helm upgrade --install loki grafana-community/loki `
   -n monitoring `
   --create-namespace `
-  -f .\loki-values.yaml
+  -f .\oki-values.yaml
 
 
   helm upgrade --install alloy grafana/alloy `
