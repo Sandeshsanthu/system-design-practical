@@ -4,7 +4,7 @@ metadata:
   name: pdf-app
   namespace: pdf-gen
 spec:
-  replicas: 2 # 🚀 Recommendation: Start with 2 for High Availability
+  replicas: 1 # 🚀 Recommendation: Start with 2 for High Availability
   selector:
     matchLabels:
       app: pdf-app

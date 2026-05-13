@@ -15,4 +15,4 @@ spec:
         host: cache-headless.pdf-gen.svc.cluster.local
         port: "6379"
         listName: "pdf_tasks" # The name of the list your app pushes to
-        listLength: "5"       # Scale out 1 pod for every 5 items in the queue
+        listLength: "20"       # Scale out 1 pod for every 5 items in the queue

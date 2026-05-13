@@ -2,7 +2,7 @@
 $region = "us-east-2"
 $namespace = "pdf-gen"
 $rdsEndpoint = "prod-postgres.cveg4qam02d9.us-east-2.rds.amazonaws.com"
-$rdsSecretArn = "arn:aws:secretsmanager:us-east-2:667383782466:secret:rds!db-b196e661-7df0-4000-ac74-a8c7950c1053-QxI6Zr"
+$rdsSecretArn = "arn:aws:secretsmanager:us-east-2:667383782466:secret:rds!db-18ffe832-d2a5-4acf-8180-a633ce53dc70-AAnDTw"
 
 $secretJson = aws secretsmanager get-secret-value `
   --secret-id $rdsSecretArn `

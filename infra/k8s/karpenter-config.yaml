@@ -41,7 +41,7 @@ metadata:
   name: default
 spec:
   amiFamily: AL2023
-  role: "Karpenter-eks-pdf-gen-20260512122835922300000016"
+  role: "Karpenter-eks-pdf-gen-20260513075054144800000019"
   subnetSelectorTerms:
     - tags:
         # Use the discovery tag you added in the VPC module
