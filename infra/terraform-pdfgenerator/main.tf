@@ -125,7 +125,7 @@
 
 # resource "aws_iam_policy" "secrets_policy" {
 #   name        = "${var.cluster_name}-secretsmanager-read"
-#   description = "Allow app service accounts to read the RDS secret"
+#   description = "Allow app services accounts to read the RDS secret"
 #
 #   policy = jsonencode({
 #     Version = "2012-10-17"
@@ -173,7 +173,7 @@
 # }
 
 # module "worker_irsa" {
-#   source  = "terraform-aws-modules/iam/aws//modules/iam-role-for-service-accounts-eks"
+#   source  = "terraform-aws-modules/iam/aws//modules/iam-role-for-services-accounts-eks"
 #   version = "~> 5.0"
 #
 #   role_name = "${var.cluster_name}-pdf-app-role"
@@ -253,7 +253,7 @@
 # }
 
 # module "karpenter_irsa" {
-#   source  = "terraform-aws-modules/iam/aws//modules/iam-role-for-service-accounts-eks"
+#   source  = "terraform-aws-modules/iam/aws//modules/iam-role-for-services-accounts-eks"
 #   version = "~> 5.0"
 #
 #   role_name                          = "KarpenterController-${var.cluster_name}"

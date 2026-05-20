@@ -1,7 +1,7 @@
 import redis
 import time
 
-# Connect to your Redis service
+# Connect to your Redis services
 r = redis.Redis(host='cache-headless.pdf-gen.svc.cluster.local', port=6379)
 
 print("Starting to add 50 tasks to the queue...")
