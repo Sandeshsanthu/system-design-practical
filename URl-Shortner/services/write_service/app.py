@@ -150,8 +150,49 @@ def shorten_url():
         conn.close()
 
 
+@app.route('/url/<short_code>', methods=['GET'])
+def get_url_stats(short_code):
+    """
+    Get statistics for a short URL.
 
+    Response:
+    {
+        "short_code": "a3Xk2",
+        "original_url": "https://example.com",
+        "clicks": 42,
+        "created_at": "2025-01-15T10:30:00",
+        "expires_at": "2025-02-15T10:30:00",
+        "status": "active"
+    }
+    """
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
 
+        cursor.execute("""
+            SELECT short_url, url, clicks, created_at, expiration_time, status
+            FROM urls
+            WHERE short_url = %s
+        """, (short_code,))
 
+        result = cursor.fetchone()
+        cursor.close()
+        conn.close()
+
+        if not result:
+            return jsonify({'error': 'URL not found'}), 404
+
+        return jsonify({
+            'short_code': result[0],
+            'original_url': result[1],
+            'clicks': result[2],
+            'created_at': result[3].isoformat() if result[3] else None,
+            'expires_at': result[4].isoformat() if result[4] else None,
+            'status': result[5]
+        }), 200
+
+    except Exception as e:
+        print(f"Error getting URL stats: {e}")
+        return jsonify({'error': str(e)}), 500
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5001)

@@ -30,3 +30,5 @@ CREATE TABLE IF NOT EXISTS click_events (
 
 CREATE INDEX IF NOT EXISTS idx_click_short_url ON click_events(short_url);
 CREATE INDEX IF NOT EXISTS idx_clicked_at ON click_events(clicked_at);
+CREATE ROLE replicator WITH REPLICATION PASSWORD 'replicator_password' LOGIN;
+GRANT CONNECT ON DATABASE urlshortener TO replicator;

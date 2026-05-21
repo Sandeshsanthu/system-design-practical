@@ -1,0 +1,508 @@
+PS C:\Users\sandeshs> $body = '{"url":"https://www.google.com","created_by":"test-user"}'
+PS C:\Users\sandeshs> $response = Invoke-RestMethod -Uri http://localhost:5001/shorten -Method POST -ContentType "application/json" -Body $body
+PS C:\Users\sandeshs> $response | ConvertTo-Json
+{
+    "expires_at":  null,
+    "original_url":  "https://www.google.com",
+    "short_url":  "http://short.url/1"
+}
+PS C:\Users\sandeshs> $code1 = $response.short_url.Split('/')[-1]
+PS C:\Users\sandeshs> $code1
+1
+PS C:\Users\sandeshs> Write-Host "Short Code: $code1" -ForegroundColor Yellow
+Short Code: 1
+PS C:\Users\sandeshs> docker exec postgres-primary psql -U admin -d urlshortener -c "SELECT short_url, url, clicks, status FROM urls WHERE short_url = '$code1';"
+ short_url |          url           | clicks | status
+-----------+------------------------+--------+--------
+ 1         | https://www.google.com |      0 | active
+(1 row)
+
+PS C:\Users\sandeshs> docker exec redis redis-cli GET "url:$code1"
+https://www.google.com
+PS C:\Users\sandeshs> $body2 = @{
+>>     url = "https://github.com"
+>>     created_by = "test-user"
+>>     expires_in_days = 7
+>> } | ConvertTo-Json
+PS C:\Users\sandeshs> $response2 = Invoke-RestMethod -Uri http://localhost:5001/shorten -Method POST -
+Invoke-RestMethod : A positional parameter cannot be found that accepts argument '-'.
+At line:1 char:14
++ ... response2 = Invoke-RestMethod -Uri http://localhost:5001/shorten -Met ...
++                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : InvalidArgument: (:) [Invoke-RestMethod], ParameterBindingException
+    + FullyQualifiedErrorId : PositionalParameterNotFound,Microsoft.PowerShell.Commands.InvokeRestMethodCommand
+
+PS C:\Users\sandeshs> $response2 = Invoke-RestMethod -Uri http://localhost:5001/shorten -Method POST -ContentType "application/json" -Body $body2
+PS C:\Users\sandeshs> $response2 | ConvertTo-Json
+{
+    "expires_at":  "2026-05-27T08:27:16.747696",
+    "original_url":  "https://github.com",
+    "short_url":  "http://short.url/2"
+}
+PS C:\Users\sandeshs> $code2 = $response2.short_url.Split('/')[-1]
+PS C:\Users\sandeshs> Write-Host "Short Code: $code2" -ForegroundColor Yellow
+Short Code: 2
+PS C:\Users\sandeshs> docker exec postgres-primary psql -U admin -d urlshortener -c "SELECT short_url, url, clicks, status, created_at FROM urls ORDER BY created_at DESC LIMIT 5;"
+ short_url |          url           | clicks | status |         created_at
+-----------+------------------------+--------+--------+----------------------------
+ 2         | https://github.com     |      0 | active | 2026-05-20 08:27:16.754154
+ 1         | https://www.google.com |      0 | active | 2026-05-20 08:23:49.440433
+(2 rows)
+
+PS C:\Users\sandeshs> try {
+>>     Invoke-WebRequest "http://localhost:5002/$code1" -MaximumRedirection 0 -UseBasicParsing
+>> } catch {
+>>     Write-Host "Status Code: $([int]$_.Exception.Response.StatusCode)" -ForegroundColor Yellow
+>>     Write-Host "Location: $($_.Exception.Response.Headers['Location'])" -ForegroundColor Green
+>> }
+
+
+StatusCode        : 301
+StatusDescription : MOVED PERMANENTLY
+Content           : <!doctype html>
+                    <html lang=en>
+                    <title>Redirecting...</title>
+                    <h1>Redirecting...</h1>
+                    <p>You should be redirected automatically to the target URL: <a
+                    href="https://www.google.com">https://www.google.co...
+RawContent        : HTTP/1.1 301 MOVED PERMANENTLY
+                    Connection: close
+                    Content-Length: 231
+                    Content-Type: text/html; charset=utf-8
+                    Date: Wed, 20 May 2026 08:33:39 GMT
+                    Location: https://www.google.com
+                    Server: Werkzeug/...
+Forms             :
+Headers           : {[Connection, close], [Content-Length, 231], [Content-Type, text/html; charset=utf-8], [Date, Wed,
+                    20 May 2026 08:33:39 GMT]...}
+Images            : {}
+InputFields       : {}
+Links             : {@{outerHTML=<a href="https://www.google.com">https://www.google.com</a>; tagName=A;
+                    href=https://www.google.com}}
+ParsedHtml        :
+RawContentLength  : 231
+
+Invoke-WebRequest : The maximum redirection count has been exceeded. To increase the number of redirections allowed,
+supply a higher value to the -MaximumRedirection parameter.
+At line:2 char:5
++     Invoke-WebRequest "http://localhost:5002/$code1" -MaximumRedirect ...
++     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : InvalidOperation: (System.Net.HttpWebRequest:HttpWebRequest) [Invoke-WebRequest], Invali
+   dOperationException
+    + FullyQualifiedErrorId : MaximumRedirectExceeded,Microsoft.PowerShell.Commands.InvokeWebRequestCommand
+
+
+PS C:\Users\sandeshs> try {
+>>     Invoke-WebRequest "http://localhost:5002/$code1" -MaximumRedirection 1 -UseBasicParsing
+>> } catch {
+>>     Write-Host "Status Code: $([int]$_.Exception.Response.StatusCode)" -ForegroundColor Yellow
+>>     Write-Host "Location: $($_.Exception.Response.Headers['Location'])" -ForegroundColor Green
+>> }
+
+
+StatusCode        : 200
+StatusDescription : OK
+Content           : <!doctype html><html itemscope="" itemtype="http://schema.org/WebPage" lang="en-IN"><head><meta
+                    content="text/html; charset=UTF-8" http-equiv="Content-Type"><meta
+                    content="/images/branding/googleg/1x/...
+RawContent        : HTTP/1.1 200 OK
+                    Content-Security-Policy-Report-Only: object-src 'none';base-uri 'self';script-src
+                    'nonce-saDFY1ZyExt7JPkRG7Oxkg' 'strict-dynamic' 'report-sample' 'unsafe-eval' 'unsafe-inline'
+                    https: ...
+Forms             :
+Headers           : {[Content-Security-Policy-Report-Only, object-src 'none';base-uri 'self';script-src
+                    'nonce-saDFY1ZyExt7JPkRG7Oxkg' 'strict-dynamic' 'report-sample' 'unsafe-eval' 'unsafe-inline'
+                    https: http:;report-uri https://csp.withgoogle.com/csp/gws/other-hp], [Accept-CH,
+                    Sec-CH-Prefers-Color-Scheme], [X-XSS-Protection, 0], [X-Frame-Options, SAMEORIGIN]...}
+Images            : {}
+InputFields       : {}
+Links             : {@{outerHTML=<a class="gb_4" aria-label="Gmail " data-pid="23"
+                    href="https://mail.google.com/mail/&amp;ogbl" target="_top">Gmail</a>; tagName=A; class=gb_4;
+                    aria-label=Gmail ; data-pid=23; href=https://mail.google.com/mail/&amp;ogbl; target=_top},
+                    @{outerHTML=<a class="gb_4" aria-label="Search for Images " data-pid="2"
+                    href="https://www.google.com/imghp?hl=en&amp;ogbl" target="_top">Images</a>; tagName=A;
+                    class=gb_4; aria-label=Search for Images ; data-pid=2;
+                    href=https://www.google.com/imghp?hl=en&amp;ogbl; target=_top}, @{outerHTML=<a class="gb_C"
+                    aria-label="Google apps" href="https://www.google.co.in/intl/en/about/products"
+                    aria-expanded="false" role="button" tabindex="0"><svg class="gb_F" aria-hidden="true"
+                    focusable="false" viewbox="0 0 24 24"><path d="M6,8c1.1,0 2,-0.9 2,-2s-0.9,-2 -2,-2 -2,0.9 -2,2
+                    0.9,2 2,2zM12,20c1.1,0 2,-0.9 2,-2s-0.9,-2 -2,-2 -2,0.9 -2,2 0.9,2 2,2zM6,20c1.1,0 2,-0.9
+                    2,-2s-0.9,-2 -2,-2 -2,0.9 -2,2 0.9,2 2,2zM6,14c1.1,0 2,-0.9 2,-2s-0.9,-2 -2,-2 -2,0.9 -2,2 0.9,2
+                    2,2zM12,14c1.1,0 2,-0.9 2,-2s-0.9,-2 -2,-2 -2,0.9 -2,2 0.9,2 2,2zM16,6c0,1.1 0.9,2 2,2s2,-0.9 2,-2
+                    -0.9,-2 -2,-2 -2,0.9 -2,2zM12,8c1.1,0 2,-0.9 2,-2s-0.9,-2 -2,-2 -2,0.9 -2,2 0.9,2 2,2zM18,14c1.1,0
+                    2,-0.9 2,-2s-0.9,-2 -2,-2 -2,0.9 -2,2 0.9,2 2,2zM18,20c1.1,0 2,-0.9 2,-2s-0.9,-2 -2,-2 -2,0.9 -2,2
+                    0.9,2 2,2z"></path><image src="https://ssl.gstatic.com/gb/images/bar/al-icon.png" alt=""
+                    height="24" width="24" style="border:none;display:none \9"></image></svg></a>; tagName=A;
+                    class=gb_C; aria-label=Google apps; href=https://www.google.co.in/intl/en/about/products;
+                    aria-expanded=false; role=button; tabindex=0}, @{outerHTML=<a class="gb_0a gb_2d gb_Td gb_Kd"
+                    aria-label="Sign in" href="https://accounts.google.com/ServiceLogin?hl=en&amp;passive=true&amp;cont
+                    inue=https://www.google.com/&amp;ec=GAZAmgQ" target="_top"><span class="gb_he">Sign in</span></a>;
+                    tagName=A; class=gb_0a gb_2d gb_Td gb_Kd; aria-label=Sign in; href=https://accounts.google.com/Serv
+                    iceLogin?hl=en&amp;passive=true&amp;continue=https://www.google.com/&amp;ec=GAZAmgQ;
+                    target=_top}...}
+ParsedHtml        :
+RawContentLength  : 84624
+
+
+
+PS C:\Users\sandeshs> try {
+>>     Invoke-WebRequest "http://localhost:5002/$code2" -MaximumRedirection 0 -UseBasicParsing
+>> } catch {
+>>     Write-Host "Status Code: $([int]$_.Exception.Response.StatusCode)" -ForegroundColor Yellow
+>>     Write-Host "Location: $($_.Exception.Response.Headers['Location'])" -ForegroundColor Green
+>> }
+
+
+StatusCode        : 301
+StatusDescription : MOVED PERMANENTLY
+Content           : <!doctype html>
+                    <html lang=en>
+                    <title>Redirecting...</title>
+                    <h1>Redirecting...</h1>
+                    <p>You should be redirected automatically to the target URL: <a
+                    href="https://github.com">https://github.com</a>. I...
+RawContent        : HTTP/1.1 301 MOVED PERMANENTLY
+                    Connection: close
+                    Content-Length: 223
+                    Content-Type: text/html; charset=utf-8
+                    Date: Wed, 20 May 2026 08:34:40 GMT
+                    Location: https://github.com
+                    Server: Werkzeug/3.1....
+Forms             :
+Headers           : {[Connection, close], [Content-Length, 223], [Content-Type, text/html; charset=utf-8], [Date, Wed,
+                    20 May 2026 08:34:40 GMT]...}
+Images            : {}
+InputFields       : {}
+Links             : {@{outerHTML=<a href="https://github.com">https://github.com</a>; tagName=A;
+                    href=https://github.com}}
+ParsedHtml        :
+RawContentLength  : 223
+
+Invoke-WebRequest : The maximum redirection count has been exceeded. To increase the number of redirections allowed,
+supply a higher value to the -MaximumRedirection parameter.
+At line:2 char:5
++     Invoke-WebRequest "http://localhost:5002/$code2" -MaximumRedirect ...
++     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : InvalidOperation: (System.Net.HttpWebRequest:HttpWebRequest) [Invoke-WebRequest], Invali
+   dOperationException
+    + FullyQualifiedErrorId : MaximumRedirectExceeded,Microsoft.PowerShell.Commands.InvokeWebRequestCommand
+
+
+PS C:\Users\sandeshs> try {
+>>     Invoke-WebRequest "http://localhost:5002/$code2" -MaximumRedirection 1 -UseBasicParsing
+>> } catch {
+>>     Write-Host "Status Code: $([int]$_.Exception.Response.StatusCode)" -ForegroundColor Yellow
+>>     Write-Host "Location: $($_.Exception.Response.Headers['Location'])" -ForegroundColor Green
+>> }
+
+
+StatusCode        : 200
+StatusDescription : OK
+Content           :
+
+
+
+
+
+
+
+                    <!DOCTYPE html>
+                    <html
+                      lang="en"
+                      data-color-mode="dark" data-dark-theme="dark"
+                      data-color-mode="light" data-light-theme="light" data-dark-theme="dark"
+                      data-a11y-animated-images="system"...
+RawContent        : HTTP/1.1 200 OK
+                    Vary: X-PJAX, X-PJAX-Container, Turbo-Visit, Turbo-Frame, X-Requested-With, Accept-Language,
+                    Sec-Fetch-Site,Accept-Encoding, Accept, X-Requested-With
+                    content-language: en-US
+                    Strict-...
+Forms             :
+Headers           : {[Vary, X-PJAX, X-PJAX-Container, Turbo-Visit, Turbo-Frame, X-Requested-With, Accept-Language,
+                    Sec-Fetch-Site,Accept-Encoding, Accept, X-Requested-With], [content-language, en-US],
+                    [Strict-Transport-Security, max-age=31536000; includeSubdomains; preload], [X-Frame-Options,
+                    deny]...}
+Images            : {}
+InputFields       : {@{outerHTML=<input id="query-builder-test" name="query-builder-test" value="" autocomplete="off"
+                    type="text" role="combobox" spellcheck="false" aria-expanded="false"
+                    aria-describedby="validation-dee0a5a8-2c55-4360-9f6a-115213c8b4f0"
+                    data-target="query-builder.input" data-action="
+                              input:query-builder#inputChange
+                              blur:query-builder#inputBlur
+                              keydown:query-builder#inputKeydown
+                              focus:query-builder#inputFocus
+                            " data-view-component="true" class="FormControl-input QueryBuilder-Input
+                    FormControl-medium" />; tagName=INPUT; id=query-builder-test; name=query-builder-test; value=;
+                    autocomplete=off; type=text; role=combobox; spellcheck=false; aria-expanded=false;
+                    aria-describedby=validation-dee0a5a8-2c55-4360-9f6a-115213c8b4f0; data-target=query-builder.input;
+                    data-action=
+                              input:query-builder#inputChange
+                              blur:query-builder#inputBlur
+                              keydown:query-builder#inputKeydown
+                              focus:query-builder#inputFocus
+                            ; data-view-component=true; class=FormControl-input QueryBuilder-Input
+                    FormControl-medium}, @{outerHTML=<input type="hidden" data-csrf="true" name="authenticity_token"
+                    value="SkGKgND9Bz2pEftwOvl/FOmuAAPy/R9JuxYG60kH5/2PzxOjaNU5clloGN7vn/zF4qIMbTC8IzreQY7dT9i7UA=="
+                    />; tagName=INPUT; type=hidden; data-csrf=true; name=authenticity_token;
+                    value=SkGKgND9Bz2pEftwOvl/FOmuAAPy/R9JuxYG60kH5/2PzxOjaNU5clloGN7vn/zF4qIMbTC8IzreQY7dT9i7UA==},
+                    @{outerHTML=<input type="hidden" data-csrf="true" name="authenticity_token"
+                    value="ix+GcggBXL53DdODEk2xF0Aij+ektbr7EU5W07WDQK7TZS+jL1U/Xd/XiaKX6O2msIQOjcOQbcLy4X8lZuFboQ=="
+                    />; tagName=INPUT; type=hidden; data-csrf=true; name=authenticity_token;
+                    value=ix+GcggBXL53DdODEk2xF0Aij+ektbr7EU5W07WDQK7TZS+jL1U/Xd/XiaKX6O2msIQOjcOQbcLy4X8lZuFboQ==},
+                    @{outerHTML=<input type="hidden" data-csrf="true"
+                    value="0u48Tvl6Qa6tF/wwuj6Rbk0UZbD3buAztqy6NUN84jvWdYHQemm9uOG5EGisZGIHyO8N756hFO/pAIdKoGsk1A=="
+                    />; tagName=INPUT; type=hidden; data-csrf=true;
+                    value=0u48Tvl6Qa6tF/wwuj6Rbk0UZbD3buAztqy6NUN84jvWdYHQemm9uOG5EGisZGIHyO8N756hFO/pAIdKoGsk1A==}...}
+Links             : {@{outerHTML=<a href="#start-of-content" data-skip-target-assigned="false" class="px-2 tmp-py-4
+                    color-bg-accent-emphasis color-fg-on-emphasis show-on-focus js-skip-to-content">Skip to
+                    content</a>; tagName=A; href=#start-of-content; data-skip-target-assigned=false; class=px-2
+                    tmp-py-4 color-bg-accent-emphasis color-fg-on-emphasis show-on-focus js-skip-to-content},
+                    @{outerHTML=<a class="tmp-mr-lg-3 color-fg-inherit flex-order-2 js-prevent-focus-on-mobile-nav"
+                            href="/"
+                            aria-label="Homepage"
+                            data-analytics-event="{&quot;category&quot;:&quot;Marketing
+                    nav&quot;,&quot;action&quot;:&quot;click to go to
+                    homepage&quot;,&quot;label&quot;:&quot;ref_page:Marketing;ref_cta:Logomark;ref_loc:Header&quot;}">
+                            <svg height="32" aria-hidden="true" data-component="Octicon" viewBox="0 0 24 24"
+                    version="1.1" width="32" data-view-component="true" class="octicon octicon-mark-github">
+                        <path d="M10.226 17.284c-2.965-.36-5.054-2.493-5.054-5.256 0-1.123.404-2.336
+                    1.078-3.144-.292-.741-.247-2.314.09-2.965.898-.112 2.111.36 2.83 1.01.853-.269 1.752-.404
+                    2.853-.404 1.1 0 1.999.135 2.807.382.696-.629 1.932-1.1 2.83-.988.315.606.36 2.179.067
+                    2.942.72.854 1.101 2 1.101 3.167 0 2.763-2.089 4.852-5.098 5.234.763.494 1.28 1.572 1.28
+                    2.807v2.336c0 .674.561 1.056 1.235.786 4.066-1.55 7.255-5.615 7.255-10.646C23.5 6.188 18.334 1
+                    11.978 1 5.62 1 .5 6.188.5 12.545c0 4.986 3.167 9.12 7.435 10.669.606.225 1.19-.18
+                    1.19-.786V20.63a2.9 2.9 0 0 1-1.078.224c-1.483
+                    0-2.359-.808-2.987-2.313-.247-.607-.517-.966-1.034-1.033-.27-.023-.359-.135-.359-.27
+                    0-.27.45-.471.898-.471.652 0 1.213.404 1.797 1.235.45.651.921.943 1.483.943.561 0 .92-.202
+                    1.437-.719.382-.381.674-.718.944-.943"></path>
+                    </svg>
+                          </a>; tagName=A; class=tmp-mr-lg-3 color-fg-inherit flex-order-2
+                    js-prevent-focus-on-mobile-nav; href=/; aria-label=Homepage;
+                    data-analytics-event={&quot;category&quot;:&quot;Marketing
+                    nav&quot;,&quot;action&quot;:&quot;click to go to
+                    homepage&quot;,&quot;label&quot;:&quot;ref_page:Marketing;ref_cta:Logomark;ref_loc:Header&quot;}},
+                    @{outerHTML=<a
+                                href="/login"
+                                class="HeaderMenu-link HeaderMenu-button d-inline-flex f5 no-underline border
+                    color-border-default rounded-2 px-2 py-1 color-fg-inherit js-prevent-focus-on-mobile-nav"
+                                data-hydro-click="{&quot;event_type&quot;:&quot;authentication.click&quot;,&quot;payloa
+                    d&quot;:{&quot;location_in_page&quot;:&quot;site header menu&quot;,&quot;repository_id&quot;:null,&
+                    quot;auth_type&quot;:&quot;SIGN_UP&quot;,&quot;originating_url&quot;:&quot;https://github.com/&quot
+                    ;,&quot;user_id&quot;:null}}"
+                    data-hydro-click-hmac="1ac0bd316eb4ecff0fd1f338bc397cea8b5025ce78fffb7ade6ffdd600360286"
+                                data-analytics-event="{&quot;category&quot;:&quot;Marketing
+                    nav&quot;,&quot;action&quot;:&quot;click to Sign
+                    in&quot;,&quot;label&quot;:&quot;ref_page:Marketing;ref_cta:Sign in;ref_loc:Header&quot;}"
+                              >
+                                Sign in
+                              </a>; tagName=A; href=/login; class=HeaderMenu-link HeaderMenu-button d-inline-flex f5
+                    no-underline border color-border-default rounded-2 px-2 py-1 color-fg-inherit
+                    js-prevent-focus-on-mobile-nav; data-hydro-click={&quot;event_type&quot;:&quot;authentication.click
+                    &quot;,&quot;payload&quot;:{&quot;location_in_page&quot;:&quot;site header menu&quot;,&quot;reposit
+                    ory_id&quot;:null,&quot;auth_type&quot;:&quot;SIGN_UP&quot;,&quot;originating_url&quot;:&quot;https
+                    ://github.com/&quot;,&quot;user_id&quot;:null}};
+                    data-hydro-click-hmac=1ac0bd316eb4ecff0fd1f338bc397cea8b5025ce78fffb7ade6ffdd600360286;
+                    data-analytics-event={&quot;category&quot;:&quot;Marketing
+                    nav&quot;,&quot;action&quot;:&quot;click to Sign
+                    in&quot;,&quot;label&quot;:&quot;ref_page:Marketing;ref_cta:Sign in;ref_loc:Header&quot;}},
+                    @{outerHTML=<a href="https://github.com/features/copilot" data-analytics-event="{&quot;action&quot;
+                    :&quot;github_copilot&quot;,&quot;tag&quot;:&quot;link&quot;,&quot;context&quot;:&quot;platform&quo
+                    t;,&quot;location&quot;:&quot;navbar&quot;,&quot;label&quot;:&quot;github_copilot_link_platform_nav
+                    bar&quot;}" class="NavLink-module__link__EG3d4"><div class="NavLink-module__text__XvpLQ"><svg
+                    data-component="Octicon" aria-hidden="true" focusable="false" class="octicon octicon-copilot
+                    NavLink-module__icon__ltGNM" viewBox="0 0 24 24" width="24" height="24" fill="currentColor"
+                    display="inline-block" overflow="visible" style="vertical-align:text-bottom"><path d="M23.922
+                    16.992c-.861 1.495-5.859 5.023-11.922 5.023-6.063 0-11.061-3.528-11.922-5.023A.641.641 0 0 1 0
+                    16.736v-2.869a.841.841 0 0 1 .053-.22c.372-.935 1.347-2.292
+                    2.605-2.656.167-.429.414-1.055.644-1.517a10.195 10.195 0 0 1-.052-1.086c0-1.331.282-2.499
+                    1.132-3.368.397-.406.89-.717 1.474-.952 1.399-1.136 3.392-2.093 6.122-2.093 2.731 0 4.767.957
+                    6.166 2.093.584.235 1.077.546 1.474.952.85.869 1.132 2.037 1.132 3.368 0 .368-.014.733-.052
+                    1.086.23.462.477 1.088.644 1.517 1.258.364 2.233 1.721 2.605 2.656a.832.832 0 0 1
+                    .053.22v2.869a.641.641 0 0 1-.078.256ZM12.172 11h-.344a4.323 4.323 0 0 1-.355.508C10.703 12.455
+                    9.555 13 7.965 13c-1.725 0-2.989-.359-3.782-1.259a2.005 2.005 0 0 1-.085-.104L4
+                    11.741v6.585c1.435.779 4.514 2.179 8 2.179 3.486 0 6.565-1.4
+                    8-2.179v-6.585l-.098-.104s-.033.045-.085.104c-.793.9-2.057 1.259-3.782 1.259-1.59
+                    0-2.738-.545-3.508-1.492a4.323 4.323 0 0 1-.355-.508h-.016.016Zm.641-2.935c.136 1.057.403
+                    1.913.878 2.497.442.544 1.134.938 2.344.938 1.573 0 2.292-.337
+                    2.657-.751.384-.435.558-1.15.558-2.361 0-1.14-.243-1.847-.705-2.319-.477-.488-1.319-.862-2.824-1.02
+                    5-1.487-.161-2.192.138-2.533.529-.269.307-.437.808-.438 1.578v.021c0 .265.021.562.063.893Zm-1.626 0
+                    c.042-.331.063-.628.063-.894v-.02c-.001-.77-.169-1.271-.438-1.578-.341-.391-1.046-.69-2.533-.529-1.
+                    505.163-2.347.537-2.824 1.025-.462.472-.705 1.179-.705 2.319 0 1.211.175 1.926.558 2.361.365.414
+                    1.084.751 2.657.751 1.21 0 1.902-.394 2.344-.938.475-.584.742-1.44.878-2.497Z"></path><path
+                    d="M14.5 14.25a1 1 0 0 1 1 1v2a1 1 0 0 1-2 0v-2a1 1 0 0 1 1-1Zm-5 0a1 1 0 0 1 1 1v2a1 1 0 0 1-2
+                    0v-2a1 1 0 0 1 1-1Z"></path></svg><span class="NavLink-module__title__Q7t0p">GitHub
+                    Copilot</span><span class="NavLink-module__subtitle__X4gkW">Write better code with
+                    AI</span></div></a>; tagName=A; href=https://github.com/features/copilot; data-analytics-event={&qu
+                    ot;action&quot;:&quot;github_copilot&quot;,&quot;tag&quot;:&quot;link&quot;,&quot;context&quot;:&qu
+                    ot;platform&quot;,&quot;location&quot;:&quot;navbar&quot;,&quot;label&quot;:&quot;github_copilot_li
+                    nk_platform_navbar&quot;}; class=NavLink-module__link__EG3d4}...}
+ParsedHtml        :
+RawContentLength  : 570617
+
+
+
+PS C:\Users\sandeshs> Write-Host "Generating 5 clicks for $code1..." -ForegroundColor Cyan
+Generating 5 clicks for 1...
+PS C:\Users\sandeshs> for ($i = 1; $i -le 5; $i++) {
+>>     try {
+>>         Invoke-WebRequest "http://localhost:5002/$code1" -MaximumRedirection 0 -UseBasicParsing -ErrorAction SilentlyContinue
+>>     } catch {}
+>>     Write-Host "  Click $i sent" -ForegroundColor White
+>>     Start-Sleep -Milliseconds 200
+>> }
+
+
+StatusCode        : 301
+StatusDescription : MOVED PERMANENTLY
+Content           : <!doctype html>
+                    <html lang=en>
+                    <title>Redirecting...</title>
+                    <h1>Redirecting...</h1>
+                    <p>You should be redirected automatically to the target URL: <a
+                    href="https://www.google.com">https://www.google.co...
+RawContent        : HTTP/1.1 301 MOVED PERMANENTLY
+                    Connection: close
+                    Content-Length: 231
+                    Content-Type: text/html; charset=utf-8
+                    Date: Wed, 20 May 2026 08:35:36 GMT
+                    Location: https://www.google.com
+                    Server: Werkzeug/...
+Forms             :
+Headers           : {[Connection, close], [Content-Length, 231], [Content-Type, text/html; charset=utf-8], [Date, Wed,
+                    20 May 2026 08:35:36 GMT]...}
+Images            : {}
+InputFields       : {}
+Links             : {@{outerHTML=<a href="https://www.google.com">https://www.google.com</a>; tagName=A;
+                    href=https://www.google.com}}
+ParsedHtml        :
+RawContentLength  : 231
+
+  Click 1 sent
+StatusCode        : 301
+StatusDescription : MOVED PERMANENTLY
+Content           : <!doctype html>
+                    <html lang=en>
+                    <title>Redirecting...</title>
+                    <h1>Redirecting...</h1>
+                    <p>You should be redirected automatically to the target URL: <a
+                    href="https://www.google.com">https://www.google.co...
+RawContent        : HTTP/1.1 301 MOVED PERMANENTLY
+                    Connection: close
+                    Content-Length: 231
+                    Content-Type: text/html; charset=utf-8
+                    Date: Wed, 20 May 2026 08:35:36 GMT
+                    Location: https://www.google.com
+                    Server: Werkzeug/...
+Forms             :
+Headers           : {[Connection, close], [Content-Length, 231], [Content-Type, text/html; charset=utf-8], [Date, Wed,
+                    20 May 2026 08:35:36 GMT]...}
+Images            : {}
+InputFields       : {}
+Links             : {@{outerHTML=<a href="https://www.google.com">https://www.google.com</a>; tagName=A;
+                    href=https://www.google.com}}
+ParsedHtml        :
+RawContentLength  : 231
+
+  Click 2 sent
+StatusCode        : 301
+StatusDescription : MOVED PERMANENTLY
+Content           : <!doctype html>
+                    <html lang=en>
+                    <title>Redirecting...</title>
+                    <h1>Redirecting...</h1>
+                    <p>You should be redirected automatically to the target URL: <a
+                    href="https://www.google.com">https://www.google.co...
+RawContent        : HTTP/1.1 301 MOVED PERMANENTLY
+                    Connection: close
+                    Content-Length: 231
+                    Content-Type: text/html; charset=utf-8
+                    Date: Wed, 20 May 2026 08:35:37 GMT
+                    Location: https://www.google.com
+                    Server: Werkzeug/...
+Forms             :
+Headers           : {[Connection, close], [Content-Length, 231], [Content-Type, text/html; charset=utf-8], [Date, Wed,
+                    20 May 2026 08:35:37 GMT]...}
+Images            : {}
+InputFields       : {}
+Links             : {@{outerHTML=<a href="https://www.google.com">https://www.google.com</a>; tagName=A;
+                    href=https://www.google.com}}
+ParsedHtml        :
+RawContentLength  : 231
+
+  Click 3 sent
+StatusCode        : 301
+StatusDescription : MOVED PERMANENTLY
+Content           : <!doctype html>
+                    <html lang=en>
+                    <title>Redirecting...</title>
+                    <h1>Redirecting...</h1>
+                    <p>You should be redirected automatically to the target URL: <a
+                    href="https://www.google.com">https://www.google.co...
+RawContent        : HTTP/1.1 301 MOVED PERMANENTLY
+                    Connection: close
+                    Content-Length: 231
+                    Content-Type: text/html; charset=utf-8
+                    Date: Wed, 20 May 2026 08:35:37 GMT
+                    Location: https://www.google.com
+                    Server: Werkzeug/...
+Forms             :
+Headers           : {[Connection, close], [Content-Length, 231], [Content-Type, text/html; charset=utf-8], [Date, Wed,
+                    20 May 2026 08:35:37 GMT]...}
+Images            : {}
+InputFields       : {}
+Links             : {@{outerHTML=<a href="https://www.google.com">https://www.google.com</a>; tagName=A;
+                    href=https://www.google.com}}
+ParsedHtml        :
+RawContentLength  : 231
+
+  Click 4 sent
+StatusCode        : 301
+StatusDescription : MOVED PERMANENTLY
+Content           : <!doctype html>
+                    <html lang=en>
+                    <title>Redirecting...</title>
+                    <h1>Redirecting...</h1>
+                    <p>You should be redirected automatically to the target URL: <a
+                    href="https://www.google.com">https://www.google.co...
+RawContent        : HTTP/1.1 301 MOVED PERMANENTLY
+                    Connection: close
+                    Content-Length: 231
+                    Content-Type: text/html; charset=utf-8
+                    Date: Wed, 20 May 2026 08:35:37 GMT
+                    Location: https://www.google.com
+                    Server: Werkzeug/...
+Forms             :
+Headers           : {[Connection, close], [Content-Length, 231], [Content-Type, text/html; charset=utf-8], [Date, Wed,
+                    20 May 2026 08:35:37 GMT]...}
+Images            : {}
+InputFields       : {}
+Links             : {@{outerHTML=<a href="https://www.google.com">https://www.google.com</a>; tagName=A;
+                    href=https://www.google.com}}
+ParsedHtml        :
+RawContentLength  : 231
+
+  Click 5 sent
+
+
+PS C:\Users\sandeshs> Write-Host "✅ Done" -ForegroundColor Green
+✅ Done
+PS C:\Users\sandeshs> docker exec rabbitmq rabbitmqctl list_queues name messages
+Timeout: 60.0 seconds ...
+Listing queues for vhost / ...
+name    messages
+click_events    0
+PS C:\Users\sandeshs> docker exec rabbitmq rabbitmqctl list_queues name messages
+Timeout: 60.0 seconds ...
+Listing queues for vhost / ...
+name    messages
+click_events    0
+PS C:\Users\sandeshs> docker compose logs --tail=20 analytics-worker-1 | Select-String -Pattern "Processing\|click"
+no configuration file provided: not found
+PS C:\Users\sandeshs> docker exec postgres-primary psql -U admin -d urlshortener -c "SELECT short_url, COUNT(*) as click_count FROM click_events GROUP BY short_url;"
+ short_url | click_count
+-----------+-------------
+ 2         |           2
+ 1         |           7
+(2 rows)
+
+PS C:\Users\sandeshs>
