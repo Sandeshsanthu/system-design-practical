@@ -35,13 +35,14 @@ jobs:
       matrix:
         include:
           - service_name: url-shortener-write-service
-            folder_path: ./URl-Shortner/services/write_service
+            dockerfile_path: ./URl-Shortner/services/write_service/Dockerfile
           - service_name: url-shortener-redirect-service
-            folder_path: ./URl-Shortner/services/redirect_service
+            dockerfile_path: ./URl-Shortner/services/redirect_service/Dockerfile
           - service_name: url-shortener-analytics-worker
-            folder_path: ./URl-Shortner/services/analytics_worker
+            dockerfile_path: ./URl-Shortner/services/analytics_worker/Dockerfile
           - service_name: url-shortener-nginx-cdn
-            folder_path: ./URl-Shortner/nginx
+            dockerfile_path: ./URl-Shortner/nginx/Dockerfile # Matches your structure
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
