@@ -37,5 +37,5 @@ class Config:
     RATE_LIMIT_REQUESTS = int(os.getenv('RATE_LIMIT_REQUESTS', 10))  # per minute
     RATE_LIMIT_WINDOW = int(os.getenv('RATE_LIMIT_WINDOW', 60))  # seconds
 
-    # Base URL
+    # Base URLs and thing
     BASE_URL = os.getenv('BASE_URL', 'http://localhost:5002/')
