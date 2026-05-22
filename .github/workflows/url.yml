@@ -43,7 +43,7 @@ jobs:
           # # ADD THIS LINE: Compiles your Nginx proxy + frontend code into one asset
           - service_name: url-shortener-nginx-cdn
             context_path: ./URl-Shortner
-            dockerfile_path: ./URl-Shortner/nginx/Dockerfile
+            dockerfile_path: ./nginx/Dockerfile
 
     steps:
       - name: Checkout code
