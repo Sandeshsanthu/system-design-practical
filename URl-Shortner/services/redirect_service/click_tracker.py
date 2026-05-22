@@ -115,4 +115,3 @@ class ClickTracker:
         if self.connection and self.connection.is_open:
             self.connection.close()
             print("✅ ClickTracker: RabbitMQ connection closed")
-11

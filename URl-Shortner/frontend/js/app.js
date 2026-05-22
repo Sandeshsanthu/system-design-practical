@@ -4,6 +4,8 @@
 const API_BASE = 'http://localhost:5001';
 const REDIRECT_BASE = 'http://localhost:5002';
 
+
+
 // DOM Elements
 const urlInput = document.getElementById('urlInput');
 const createdByInput = document.getElementById('createdBy');
@@ -173,6 +175,7 @@ async function getAnalytics() {
         totalClicks.textContent = data.total_clicks || 0;
 
         // Calculate recent clicks (last 24 hours)
+        const safeClicks = data.recent_clicks || [];
         const now = new Date();
         const last24h = data.recent_clicks.filter(click => {
             const clickTime = new Date(click.timestamp);
@@ -182,10 +185,10 @@ async function getAnalytics() {
         recentClicks.textContent = last24h.length;
 
         // Display recent clicks
-        if (data.recent_clicks && data.recent_clicks.length > 0) {
-            clicksList.innerHTML = data.recent_clicks.slice(0, 5).map(click => `
+        if (safeClicks.length > 0) {
+            clicksList.innerHTML = safeClicks.slice(0, 5).map(click => `
                 <div class="click-item">
-                    <span class="click-time">${formatTime(click.timestamp)}</span>
+                    <span class="click-time">${click.timestamp ? formatTime(click.timestamp) : 'Unknown time'}</span>
                     <span class="click-ip">${click.ip || 'Unknown'}</span>
                 </div>
             `).join('');
