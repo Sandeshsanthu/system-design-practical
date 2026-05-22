@@ -35,13 +35,14 @@ jobs:
       matrix:
         include:
           - service_name: url-shortener-write-service
-            dockerfile_path: ./URl-Shortner/services/write_service/Dockerfile
+            folder_path: ./URl-Shortner/services/write_service
           - service_name: url-shortener-redirect-service
-            dockerfile_path: ./URl-Shortner/services/redirect_service/Dockerfile
+            folder_path: ./URl-Shortner/services/redirect_service
           - service_name: url-shortener-analytics-worker
-            dockerfile_path: ./URl-Shortner/services/analytics_worker/Dockerfile
+            folder_path: ./URl-Shortner/services/analytics_worker
+          # ADD THIS LINE: Compiles your Nginx proxy + frontend code into one asset
           - service_name: url-shortener-nginx-cdn
-            dockerfile_path: ./URl-Shortner/nginx/Dockerfile # Matches your structure
+            folder_path: ./URl-Shortner/nginx
 
     steps:
       - name: Checkout code
