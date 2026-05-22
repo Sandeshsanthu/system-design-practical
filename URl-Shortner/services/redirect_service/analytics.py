@@ -39,20 +39,7 @@ class AnalyticsService:
         )
 
     def get_url_summary(self, short_url: str) -> Optional[Dict]:
-        """
-        Get comprehensive summary for a specific URL.
 
-        Returns:
-            {
-                'url': 'https://example.com',
-                'short_url': 'a3Xk2',
-                'total_clicks': 1547,
-                'unique_ips': 892,
-                'created_at': '2025-01-15T10:30:00',
-                'last_accessed': '2025-01-20T14:22:00',
-                'status': 'active'
-            }
-        """
         cursor = self.conn.cursor()
 
         cursor.execute("""
@@ -283,19 +270,7 @@ class AnalyticsService:
         return dict(result) if result else {}
 
     def get_top_urls(self, limit: int = 10, days: Optional[int] = None) -> List[Dict]:
-        """
-        Get most popular URLs.
 
-        Args:
-            limit: Number of URLs to return
-            days: If specified, only count clicks from last N days
-
-        Returns:
-            [
-                {'short_url': 'a3Xk2', 'url': 'https://...', 'clicks': 5432},
-                ...
-            ]
-        """
         cursor = self.conn.cursor()
 
         if days:

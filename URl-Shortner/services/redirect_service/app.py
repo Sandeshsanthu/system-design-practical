@@ -535,54 +535,6 @@ def internal_error(error):
         'status': 500
     }), 500
 
-
-
-
-
-
-
-
-
-
-
-
-
-# RabbitMQ connection
-def get_rabbitmq_connection():
-    return pika.BlockingConnection(
-        pika.ConnectionParameters(
-            host=os.getenv('RABBITMQ_HOST', 'rabbitmq'),
-            heartbeat=600,
-            blocked_connection_timeout=300
-        )
-    )
-
-
-# Publish click event to RabbitMQ
-def publish_click_event(short_url, ip_address):
-    try:
-        connection = get_rabbitmq_connection()
-        channel = connection.channel()
-        channel.queue_declare(queue='click_events', durable=True)
-
-        message = json.dumps({
-            'short_url': short_url,
-            'ip_address': ip_address,
-            'timestamp': datetime.utcnow().isoformat()
-        })
-
-        channel.basic_publish(
-            exchange='',
-            routing_key='click_events',
-            body=message,
-            properties=pika.BasicProperties(delivery_mode=2)
-        )
-
-        connection.close()
-    except Exception as e:
-        print(f"Failed to publish click event: {e}")
-
-
 @app.route('/<short_code>')
 def redirect_url(short_code):
     try:
