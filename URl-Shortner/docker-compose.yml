@@ -197,7 +197,7 @@ services:
       RABBITMQ_USER: guest
       RABBITMQ_PASSWORD: guest
       RABBITMQ_QUEUE: click_events
-      BASE_URL: http://short.url/
+      BASE_URL: http://localhost/
     depends_on:
       postgres-replica:
         condition: service_healthy

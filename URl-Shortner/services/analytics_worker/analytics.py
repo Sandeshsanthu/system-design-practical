@@ -56,7 +56,7 @@ class AnalyticsService:
         cursor = self.conn.cursor()
 
         cursor.execute("""
-            SELECT 
+            SELECT
                 u.url,
                 u.short_url,
                 u.clicks as total_clicks,
@@ -107,7 +107,7 @@ class AnalyticsService:
         }
 
         cursor.execute(f"""
-            SELECT 
+            SELECT
                 date_trunc(%s, clicked_at) as time_bucket,
                 COUNT(*) as clicks
             FROM click_events
@@ -136,7 +136,7 @@ class AnalyticsService:
         cursor = self.conn.cursor()
 
         cursor.execute("""
-            SELECT 
+            SELECT
                 COALESCE(referrer, 'Direct') as referrer,
                 COUNT(*) as clicks
             FROM click_events
@@ -165,7 +165,7 @@ class AnalyticsService:
         cursor = self.conn.cursor()
 
         cursor.execute("""
-            SELECT 
+            SELECT
                 COALESCE(country, 'Unknown') as country,
                 COUNT(*) as clicks
             FROM click_events
@@ -235,7 +235,7 @@ class AnalyticsService:
         cursor = self.conn.cursor()
 
         cursor.execute("""
-            SELECT 
+            SELECT
                 EXTRACT(HOUR FROM clicked_at) as hour,
                 COUNT(*) as clicks
             FROM click_events
@@ -266,12 +266,12 @@ class AnalyticsService:
         cursor = self.conn.cursor()
 
         cursor.execute("""
-            SELECT 
+            SELECT
                 COUNT(*) as total_urls,
                 SUM(clicks) as total_clicks,
-                COUNT(*) FILTER (WHERE status = 'active' AND 
+                COUNT(*) FILTER (WHERE status = 'active' AND
                     (expiration_time IS NULL OR expiration_time > NOW())) as active_urls,
-                COUNT(*) FILTER (WHERE status = 'active' AND 
+                COUNT(*) FILTER (WHERE status = 'active' AND
                     expiration_time IS NOT NULL AND expiration_time <= NOW()) as expired_urls,
                 AVG(clicks) as avg_clicks_per_url
             FROM urls
@@ -300,7 +300,7 @@ class AnalyticsService:
 
         if days:
             cursor.execute("""
-                SELECT 
+                SELECT
                     u.short_url,
                     u.url,
                     COUNT(c.id) as recent_clicks
@@ -313,7 +313,7 @@ class AnalyticsService:
             """, (days, limit))
         else:
             cursor.execute("""
-                SELECT 
+                SELECT
                     short_url,
                     url,
                     clicks
