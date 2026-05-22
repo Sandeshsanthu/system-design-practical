@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>URL Shortener - Fast & Simple</title>
+    <link rel="stylesheet" href="/css/style.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <header class="header">
+            <div class="logo">
+                <svg width="32" height="32" viewBox="0 0 32 32" fill="none">
+                    <rect width="32" height="32" rx="8" fill="#3B82F6"/>
+                    <path d="M12 20L20 12M20 12H14M20 12V18" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+                <span>QuickLink</span>
+            </div>
+            <div class="stats" id="globalStats">
+                <div class="stat-item">
+                    <span class="stat-value">0</span>
+                    <span class="stat-label">URLs Created</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-value">0</span>
+                    <span class="stat-label">Total Clicks</span>
+                </div>
+            </div>
+        </header>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <!-- Shorten URL Section -->
+            <section class="shorten-section">
+                <h1>Shorten Your Links in Seconds</h1>
+                <p class="subtitle">Fast, reliable, and powered by distributed infrastructure</p>
+
+                <div class="shorten-form">
+                    <div class="input-group">
+                        <input
+                            type="url"
+                            id="urlInput"
+                            placeholder="Enter your long URL here..."
+                            required
+                        >
+                        <button id="shortenBtn" class="btn-primary">
+                            <span class="btn-text">Shorten URL</span>
+                            <span class="btn-loading" style="display: none;">
+                                <svg class="spinner" viewBox="0 0 24 24">
+                                    <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" fill="none"/>
+                                </svg>
+                            </span>
+                        </button>
+                    </div>
+                    <div class="created-by-input">
+                        <input
+                            type="text"
+                            id="createdBy"
+                            placeholder="Your name (optional)"
+                            maxlength="50"
+                        >
+                    </div>
+                </div>
+
+                <!-- Result Display -->
+                <div id="resultSection" class="result-section" style="display: none;">
+                    <div class="result-card">
+                        <div class="result-header">
+                            <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+                                <path d="M16.666 9.99935C16.666 13.6813 13.6813 16.666 9.99935 16.666C6.31745 16.666 3.33268 13.6813 3.33268 9.99935C3.33268 6.31745 6.31745 3.33268 9.99935 3.33268C13.6813 3.33268 16.666 6.31745 16.666 9.99935Z" stroke="#10B981" stroke-width="2"/>
+                                <path d="M7.5 10L9.16667 11.6667L12.5 8.33333" stroke="#10B981" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                            </svg>
+                            <span>URL Shortened Successfully!</span>
+                        </div>
+                        <div class="shortened-url">
+                            <input type="text" id="shortUrlDisplay" readonly>
+                            <button id="copyBtn" class="btn-copy">
+                                <svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor">
+                                    <path d="M8 3a1 1 0 011-1h2a1 1 0 110 2H9a1 1 0 01-1-1z"/>
+                                    <path d="M6 3a2 2 0 00-2 2v11a2 2 0 002 2h8a2 2 0 002-2V5a2 2 0 00-2-2 3 3 0 01-3 3H9a3 3 0 01-3-3z"/>
+                                </svg>
+                                Copy
+                            </button>
+                        </div>
+                        <div class="original-url">
+                            <span class="label">Original:</span>
+                            <span id="originalUrlDisplay"></span>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Analytics Section -->
+            <section class="analytics-section">
+                <h2>Check Your Link Analytics</h2>
+                <p class="subtitle">Enter your short URL to see click statistics</p>
+
+                <div class="analytics-form">
+                    <div class="input-group">
+                        <input
+                            type="text"
+                            id="analyticsInput"
+                            placeholder="Enter short code (e.g., 2)"
+                        >
+                        <button id="analyticsBtn" class="btn-secondary">
+                            <svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor">
+                                <path d="M2 11a1 1 0 011-1h2a1 1 0 011 1v5a1 1 0 01-1 1H3a1 1 0 01-1-1v-5zM8 7a1 1 0 011-1h2a1 1 0 011 1v9a1 1 0 01-1 1H9a1 1 0 01-1-1V7zM14 4a1 1 0 011-1h2a1 1 0 011 1v12a1 1 0 01-1 1h-2a1 1 0 01-1-1V4z"/>
+                            </svg>
+                            Get Analytics
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Analytics Result -->
+                <div id="analyticsResult" style="display: none;">
+                    <div class="analytics-card">
+                        <div class="analytics-header">
+                            <h3 id="analyticsShortUrl"></h3>
+                            <span class="test-redirect-btn" id="testRedirectBtn">Test Redirect →</span>
+                        </div>
+                        <div class="analytics-stats">
+                            <div class="stat-box">
+                                <div class="stat-number" id="totalClicks">0</div>
+                                <div class="stat-title">Total Clicks</div>
+                            </div>
+                            <div class="stat-box">
+                                <div class="stat-number" id="recentClicks">0</div>
+                                <div class="stat-title">Last 24 Hours</div>
+                            </div>
+                        </div>
+                        <div class="recent-clicks">
+                            <h4>Recent Activity</h4>
+                            <div id="clicksList" class="clicks-list"></div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+        </main>
+
+        <!-- Footer -->
+        <footer class="footer">
+            <div class="footer-content">
+                <p>Powered by distributed architecture with PostgreSQL replication, Redis caching, and RabbitMQ messaging</p>
+                <div class="tech-badges">
+                    <span class="badge">PostgreSQL</span>
+                    <span class="badge">Redis</span>
+                    <span class="badge">RabbitMQ</span>
+                    <span class="badge">Nginx CDN</span>
+                </div>
+            </div>
+        </footer>
+    </div>
+
+    <!-- Toast Notification -->
+    <div id="toast" class="toast"></div>
+
+    <script src="/js/app.js"></script>
+</body>
+</html>

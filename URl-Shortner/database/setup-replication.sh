@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/sh
 set -e
 
 DATA_DIR="/var/lib/postgresql/data"
@@ -10,10 +10,9 @@ until pg_isready -h postgres-primary -p 5432 -U admin; do
 done
 
 # If the data directory is completely empty, pull down the physical backup from primary
-if [ -z "$(ls -A "$DATA_DIR")" ]; then
+if [ ! -s "$DATA_DIR/PG_VERSION" ]; then
   echo "🚀 Data directory is empty. Initializing base backup from primary..."
 
-  # Run backup using the 'admin' superuser account
   PGPASSWORD="password" pg_basebackup \
     -h postgres-primary \
     -D "$DATA_DIR" \

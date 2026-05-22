@@ -38,4 +38,4 @@ class Config:
     RATE_LIMIT_WINDOW = int(os.getenv('RATE_LIMIT_WINDOW', 60))  # seconds
 
     # Base URL
-    BASE_URL = os.getenv('BASE_URL', 'http://short.url/')
+    BASE_URL = os.getenv('BASE_URL', 'http://localhost:5002/')
