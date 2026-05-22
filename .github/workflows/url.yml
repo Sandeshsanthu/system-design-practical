@@ -36,10 +36,10 @@ jobs:
         include:
           - service_name: url-shortener-write-service
             folder_path: ./URl-Shortner/services/write_service
-          # - service_name: url-shortener-redirect-service
-          #   folder_path: ./URl-Shortner/services/redirect_service
-          # - service_name: url-shortener-analytics-worker
-          #   folder_path: ./URl-Shortner/services/analytics_worker
+          - service_name: url-shortener-redirect-service
+            folder_path: ./URl-Shortner/services/redirect_service
+          - service_name: url-shortener-analytics-worker
+            folder_path: ./URl-Shortner/services/analytics_worker
           # # ADD THIS LINE: Compiles your Nginx proxy + frontend code into one asset
           # - service_name: url-shortener-nginx-cdn
           #   folder_path: ./URl-Shortner/nginx
