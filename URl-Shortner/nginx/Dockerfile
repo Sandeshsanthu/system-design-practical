@@ -8,7 +8,8 @@ RUN rm /etc/nginx/conf.d/default.conf
 COPY ./nginx.conf /etc/nginx/nginx.conf
 
 # 3. Copy your entire static frontend dashboard directory into the Nginx web root
-COPY ../frontend /usr/share/nginx/html
+COPY ./frontend /usr/share/nginx/html
+
 
 EXPOSE 80
 CMD ["nginx", "-g", "daemon off;"]
