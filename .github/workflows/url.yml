@@ -42,12 +42,19 @@ jobs:
             folder_path: ./URl-Shortner/services/analytics_worker
           # # ADD THIS LINE: Compiles your Nginx proxy + frontend code into one asset
           - service_name: url-shortener-nginx-cdn
-            context_path: ./URl-Shortner
-            dockerfile_path: ./URl-Shortner/nginx/Dockerfile
+            context_path: .
+            dockerfile_path: ./nginx/Dockerfile
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+
+      - name: Debug paths
+        run: |
+          pwd
+          ls -la
+          ls -la nginx
+          ls -la frontend
 
       - name: Login to Docker Hub
         uses: docker/login-action@v3
