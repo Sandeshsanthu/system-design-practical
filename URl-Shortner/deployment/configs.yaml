@@ -17,34 +17,43 @@ metadata:
   namespace: url-shortener
 data:
   nginx.conf: |
-    user nginx;
+    # Force Nginx to run explicitly in the foreground
+    daemon off;
     worker_processes auto;
-    error_log /var/log/nginx/error.log warn;
-    pid /var/run/nginx.pid;
-    events { worker_connections 1024; }
+    pid /tmp/nginx.pid; # Moved from /var/run/ to a completely writable path
+
+    events { 
+        worker_connections 1024; 
+    }
+
     http {
         include /etc/nginx/mime.types;
         default_type application/octet-stream;
         sendfile on;
         keepalive_timeout 65;
-    
+
+        # FIXED: Re-routed temp paths to /tmp/ to fix permission and silence crashes
+        client_body_temp_path /tmp/client_temp;
+        proxy_temp_path       /tmp/proxy_temp_path;
+        fastcgi_temp_path     /tmp/fastcgi_temp;
+        uwsgi_temp_path       /tmp/uwsgi_temp;
+        scgi_temp_path        /tmp/scgi_temp;
+
         server {
             listen 80;
-    
-            # Serve healthchecks natively
+            server_name localhost;
+            
             location /nginx-health {
                 access_log off;
                 return 200 "healthy\n";
             }
-    
-            # Static file serving structure
+            
             location / {
                 root /usr/share/nginx/html;
                 index index.html index.htm;
                 try_files $uri $uri/ /index.html;
             }
-    
-            # Reverse proxy write routing rules
+            
             location /shorten {
                 proxy_pass http://write-service:5001/shorten;
                 proxy_set_header Host $host;

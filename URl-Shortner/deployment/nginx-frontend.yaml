@@ -15,29 +15,10 @@ spec:
     spec:
       containers:
         - name: nginx-cdn
-          image: sandeshs/url-shortener-nginx-cdn:7a1453c4e582573160f7cdde8c46e5e802189913
-          # FIXED: Pass the daemon configuration directly into the entrypoint command arguments block
-          command: ["nginx"]
-          args: ["-g", "daemon off;"]
+          image: sandeshs/url-shortener-nginx-cdn:d60a2191906906e8b153b0fd480d6dff6eba6c69
           ports:
-            - containerPort: 80
+            - containerPort: 8080 # Matches our new unprivileged container port configuration
               name: http
-          volumeMounts:
-            - name: nginx-config-volume
-              mountPath: /etc/nginx/nginx.conf
-              subPath: nginx.conf
-              readOnly: true
-            - name: frontend-source-volume
-              mountPath: /usr/share/nginx/html
-              readOnly: true
-      volumes:
-        - name: nginx-config-volume
-          configMap:
-            name: postgres-configs
-        - name: frontend-source-volume
-          hostPath:
-            path: /run/desktop/mnt/host/c/Users/sandeshs/system-design-practical/URl-Shortner/frontend
-            type: Directory
 ---
 apiVersion: v1
 kind: Service
@@ -50,5 +31,5 @@ spec:
     app: nginx-cdn
   ports:
     - port: 80
-      targetPort: 80
+      targetPort: 8080 # Correctly maps port 80 traffic down to container port 8080
       nodePort: 30080
