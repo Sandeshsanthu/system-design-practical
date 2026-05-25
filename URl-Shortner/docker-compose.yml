@@ -258,7 +258,7 @@ services:
       - url-shortener-network
 
   nginx-cdn:
-    image: sandeshs/url-shortener-nginx-cdn:7a1453c4e582573160f7cdde8c46e5e802189913
+    image: sandeshs/url-shortener-nginx-cdn:ecdb1e3acca118beb147452dfb7ac3441f7e14d1
     container_name: nginx-cdn
     ports:
       - "8080:80"

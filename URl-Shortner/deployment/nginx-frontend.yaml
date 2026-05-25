@@ -15,7 +15,7 @@ spec:
     spec:
       containers:
         - name: nginx-cdn
-          image: sandeshs/url-shortener-nginx-cdn:d60a2191906906e8b153b0fd480d6dff6eba6c69
+          image: sandeshs/url-shortener-nginx-cdn:ecdb1e3acca118beb147452dfb7ac3441f7e14d1
           ports:
             - containerPort: 8080 # Matches our new unprivileged container port configuration
               name: http
