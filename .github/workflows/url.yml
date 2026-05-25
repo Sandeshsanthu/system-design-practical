@@ -45,8 +45,9 @@ jobs:
             dockerfile_path: ./URl-Shortner/services/analytics_worker/Dockerfile
           # FIXED: Unified matrix keys and set context to subfolder to expose both nginx and frontend folders
           - service_name: url-shortener-nginx-cdn
-            context_path: ./URl-Shortner
+            context_path: ./URl-Shortner/nginx
             dockerfile_path: ./URl-Shortner/nginx/Dockerfile
+
 
     steps:
       - name: Checkout code
