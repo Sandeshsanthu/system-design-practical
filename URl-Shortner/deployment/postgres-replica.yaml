@@ -1,0 +1,103 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: postgres-replica
+  namespace: url-shortener
+spec:
+  serviceName: "postgres-replica-headless"
+  replicas: 1
+  selector:
+    matchLabels:
+      app: postgres-replica
+  template:
+    metadata:
+      labels:
+        app: postgres-replica
+    spec:
+      securityContext:
+        runAsUser: 999
+        fsGroup: 999
+      containers:
+        - name: postgres-replica
+          image: postgres:15
+          env:
+            - name: POSTGRES_USER
+              valueFrom:
+                secretKeyRef: { name: postgres-secrets, key: POSTGRES_USER }
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef: { name: postgres-secrets, key: POSTGRES_PASSWORD }
+            - name: PGDATA
+              value: /var/lib/postgresql/data/pgdata
+          ports:
+            - containerPort: 5432
+              name: postgres
+          volumeMounts:
+            - name: config-files
+              mountPath: /etc/postgresql/postgresql.conf
+              subPath: replica-postgresql.conf
+            - name: postgres-replica-data
+              mountPath: /var/lib/postgresql/data
+          command: ["/bin/sh", "-c"]
+          args:
+            - |
+              set -e
+              echo '🔄 Initializing PostgreSQL Replica...'
+              
+              until PGPASSWORD=password pg_isready -h postgres-primary-headless -U admin -d postgres 2>/dev/null; do
+                echo '⏳ Waiting for primary database...'
+                sleep 2
+              done
+              echo '✅ Primary is ready'
+              
+              if [ ! -s "$PGDATA/PG_VERSION" ]; then
+                echo '📦 First run - performing base backup from primary...'
+                rm -rf "$PGDATA"/*
+                sleep 5
+                
+                echo '📥 Starting pg_basebackup...'
+                # FIXED: Removed "-C" flag so it uses the pre-created "replica_slot" instead of trying to make a new one
+                PGPASSWORD=replicator_password pg_basebackup \
+                  -h postgres-primary-headless \
+                  -D "$PGDATA" \
+                  -U replicator \
+                  -v -P -R -X stream -S replica_slot || {
+                    echo '❌ Base backup failed. Retrying in 5 seconds...'
+                    sleep 5
+                    PGPASSWORD=replicator_password pg_basebackup \
+                      -h postgres-primary-headless \
+                      -D "$PGDATA" \
+                      -U replicator \
+                      -v -P -R -X stream -S replica_slot
+                  }
+                
+                echo '✅ Base backup complete'
+                
+                cat >> "$PGDATA/postgresql.auto.conf" <<EOF
+              include = '/etc/postgresql/postgresql.conf'
+              primary_conninfo = 'host=postgres-primary-headless port=5432 user=replicator password=replicator_password application_name=replica_slot'
+              EOF
+                echo '✅ Replica configuration complete'
+              else
+                echo '✅ Existing data found, starting in recovery mode'
+              fi
+              
+              echo '🚀 Starting PostgreSQL replica...'
+              exec postgres -c config_file=/etc/postgresql/postgresql.conf
+          readinessProbe:
+            exec:
+              command: ["pg_isready", "-U", "admin", "-d", "urlshortener"]
+            initialDelaySeconds: 15
+            periodSeconds: 10
+      volumes:
+        - name: config-files
+          configMap:
+            name: postgres-configs
+  volumeClaimTemplates:
+    - metadata:
+        name: postgres-replica-data
+      spec:
+        accessModes: [ "ReadWriteOnce" ]
+        resources:
+          requests:
+            storage: 10Gi

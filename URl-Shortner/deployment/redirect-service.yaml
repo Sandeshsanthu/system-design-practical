@@ -1,0 +1,81 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: redirect-service
+  namespace: url-shortener
+spec:
+  replicas: 1 # Scale up easily to handle redirect traffic surges
+  selector:
+    matchLabels:
+      app: redirect-service
+  template:
+    metadata:
+      labels:
+        app: redirect-service
+    spec:
+      containers:
+        - name: redirect-service
+          image: sandeshs/url-shortener-redirect-service:7a1453c4e582573160f7cdde8c46e5e802189913
+          ports:
+            - containerPort: 5002
+              name: http
+          env:
+            - name: PYTHONPATH
+              value: "/app"
+            # Route reads through the replica service proxy
+            - name: DB_REPLICA_HOST
+              value: "postgres-read-router"
+            - name: DB_REPLICA_PORT
+              value: "5432"
+            # Cache targeting properties
+            - name: REDIS_HOST
+              value: "redis"
+            - name: REDIS_PORT
+              value: "6379"
+            - name: REDIS_TTL
+              value: "3600"
+            # Queue broker targeting properties for click tracking analytics
+            - name: RABBITMQ_HOST
+              value: "rabbitmq"
+            - name: RABBITMQ_PORT
+              value: "5672"
+            - name: RABBITMQ_USER
+              value: "guest"
+            - name: RABBITMQ_PASSWORD
+              value: "guest"
+            - name: RABBITMQ_QUEUE
+              value: "click_events"
+            - name: BASE_URL
+              value: "http://localhost/"
+            # Reusing credentials from your database secret map
+            - name: DB_NAME
+              valueFrom:
+                secretKeyRef: { name: postgres-secrets, key: POSTGRES_DB }
+            - name: DB_USER
+              valueFrom:
+                secretKeyRef: { name: postgres-secrets, key: POSTGRES_USER }
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef: { name: postgres-secrets, key: POSTGRES_PASSWORD }
+          volumeMounts:
+            - name: app-config-volume
+              mountPath: /app/config.py
+              subPath: config.py
+              readOnly: true
+      volumes:
+        - name: app-config-volume
+          configMap:
+            name: postgres-configs
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: redirect-service
+  namespace: url-shortener
+spec:
+  type: ClusterIP
+  selector:
+    app: redirect-service
+  ports:
+    - port: 5002
+      targetPort: 5002

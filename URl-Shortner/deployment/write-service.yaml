@@ -1,0 +1,84 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: write-service
+  namespace: url-shortener
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: write-service
+  template:
+    metadata:
+      labels:
+        app: write-service
+    spec:
+      containers:
+        - name: write-service
+          image: sandeshs/url-shortener-write-service:7a1453c4e582573160f7cdde8c46e5e802189913
+          ports:
+            - containerPort: 5001
+              name: http
+          env:
+            - name: PYTHONPATH
+              value: "/app"
+            # Postgres Write target routing map
+            - name: DB_PRIMARY_HOST
+              value: "postgres-write-router"
+            - name: DB_PRIMARY_PORT
+              value: "5432"
+            # Postgres Read replica map (adding this to ensure config validation handles smoothly)
+            - name: DB_REPLICA_HOST
+              value: "postgres-read-router"
+            - name: DB_REPLICA_PORT
+              value: "5432"
+            # Cache targeting properties
+            - name: REDIS_HOST
+              value: "redis"
+            - name: REDIS_PORT
+              value: "6379"
+            - name: REDIS_TTL
+              value: "3600"
+            # Queue broker targeting properties
+            - name: RABBITMQ_HOST
+              value: "rabbitmq"
+            - name: RABBITMQ_PORT
+              value: "5672"
+            - name: RABBITMQ_USER
+              value: "guest"
+            - name: RABBITMQ_PASSWORD
+              value: "guest"
+            - name: RABBITMQ_QUEUE
+              value: "click_events"
+            # Reusing credentials from your database secret map
+            - name: DB_NAME
+              valueFrom:
+                secretKeyRef: { name: postgres-secrets, key: POSTGRES_DB }
+            - name: DB_USER
+              valueFrom:
+                secretKeyRef: { name: postgres-secrets, key: POSTGRES_USER }
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef: { name: postgres-secrets, key: POSTGRES_PASSWORD }
+          volumeMounts:
+            - name: app-config-volume
+              mountPath: /app/config.py
+              subPath: config.py
+              readOnly: true
+      volumes:
+        - name: app-config-volume
+          configMap:
+            name: postgres-configs
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: write-service
+  namespace: url-shortener
+spec:
+  type: ClusterIP
+  selector:
+    app: write-service
+  ports:
+    - port: 5001
+      targetPort: 5001

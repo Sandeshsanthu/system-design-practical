@@ -1,0 +1,69 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: postgres-primary
+  namespace: url-shortener
+spec:
+  serviceName: "postgres-primary-headless"
+  replicas: 1
+  selector:
+    matchLabels:
+      app: postgres-primary
+  template:
+    metadata:
+      labels:
+        app: postgres-primary
+    spec:
+      containers:
+        - name: postgres-primary
+          image: postgres:15
+          envFrom:
+            - secretRef:
+                name: postgres-secrets
+          ports:
+            - containerPort: 5432
+              name: postgres
+          # Points Postgres directly to the safe /etc/postgresql/custom/ configuration paths
+          args: ["-c", "config_file=/etc/postgresql/custom/postgresql.conf", "-c", "hba_file=/etc/postgresql/custom/pg_hba.conf"]
+          livenessProbe:
+            exec:
+              command: ["pg_isready", "-U", "admin", "-d", "urlshortener"]
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 5
+          readinessProbe:
+            exec:
+              command: ["pg_isready", "-U", "admin", "-d", "urlshortener"]
+            initialDelaySeconds: 20
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+          volumeMounts:
+            - name: init-script
+              mountPath: /docker-entrypoint-initdb.d/init.sql
+              subPath: init.sql
+            # Changed destination paths to keep them separate from the writable data directory
+            - name: config-files
+              mountPath: /etc/postgresql/custom/postgresql.conf
+              subPath: primary-postgresql.conf
+            - name: config-files
+              mountPath: /etc/postgresql/custom/pg_hba.conf
+              subPath: primary-pg_hba.conf
+            - name: postgres-primary-data
+              mountPath: /var/lib/postgresql/data
+      volumes:
+        - name: init-script
+          configMap:
+            name: postgres-configs
+        - name: config-files
+          configMap:
+            name: postgres-configs
+  volumeClaimTemplates:
+    - metadata:
+        name: postgres-primary-data
+      spec:
+        accessModes: [ "ReadWriteOnce" ]
+        resources:
+          requests:
+            storage: 10Gi

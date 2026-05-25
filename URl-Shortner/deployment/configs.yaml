@@ -1,0 +1,145 @@
+apiVersion: v1
+kind: Secret
+metadata:
+  name: postgres-secrets
+  namespace: url-shortener
+type: Opaque
+stringData:
+  POSTGRES_DB: "urlshortener"
+  POSTGRES_USER: "admin"
+  POSTGRES_PASSWORD: "password"
+  REPLICATOR_PASSWORD: "replicator_password"
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: postgres-configs
+  namespace: url-shortener
+data:
+  nginx.conf: |
+    user nginx;
+    worker_processes auto;
+    error_log /var/log/nginx/error.log warn;
+    pid /var/run/nginx.pid;
+    events { worker_connections 1024; }
+    http {
+        include /etc/nginx/mime.types;
+        default_type application/octet-stream;
+        sendfile on;
+        keepalive_timeout 65;
+    
+        server {
+            listen 80;
+    
+            # Serve healthchecks natively
+            location /nginx-health {
+                access_log off;
+                return 200 "healthy\n";
+            }
+    
+            # Static file serving structure
+            location / {
+                root /usr/share/nginx/html;
+                index index.html index.htm;
+                try_files $uri $uri/ /index.html;
+            }
+    
+            # Reverse proxy write routing rules
+            location /shorten {
+                proxy_pass http://write-service:5001/shorten;
+                proxy_set_header Host $host;
+                proxy_set_header X-Real-IP $remote_addr;
+            }
+        }
+    }
+  
+
+  # Mounts your custom local files
+  init.sql: |
+    CREATE TABLE IF NOT EXISTS urls (
+        id BIGSERIAL PRIMARY KEY,
+        url TEXT NOT NULL,
+        short_url VARCHAR(10) UNIQUE NOT NULL,
+        created_at TIMESTAMP DEFAULT NOW(),
+        expiration_time TIMESTAMP,
+        created_by VARCHAR(100),
+        status VARCHAR(20) DEFAULT 'active',
+        clicks BIGINT DEFAULT 0,
+        last_accessed TIMESTAMP
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_short_url ON urls(short_url);
+    CREATE INDEX IF NOT EXISTS idx_status ON urls(status);
+    CREATE INDEX IF NOT EXISTS idx_created_by ON urls(created_by);
+    CREATE INDEX IF NOT EXISTS idx_expiration ON urls(expiration_time);
+    
+    CREATE TABLE IF NOT EXISTS click_events (
+        id BIGSERIAL PRIMARY KEY,
+        short_url VARCHAR(10) NOT NULL,
+        clicked_at TIMESTAMP DEFAULT NOW(),
+        user_agent TEXT,
+        ip_address VARCHAR(45),
+        referrer TEXT,
+        country VARCHAR(100)
+    );
+    
+    CREATE INDEX IF NOT EXISTS idx_click_short_url ON click_events(short_url);
+    CREATE INDEX IF NOT EXISTS idx_clicked_at ON click_events(clicked_at);
+    
+    DROP ROLE IF EXISTS replicator;
+    CREATE ROLE replicator WITH REPLICATION PASSWORD 'replicator_password' LOGIN;
+    GRANT CONNECT ON DATABASE urlshortener TO replicator;
+    SELECT * FROM pg_create_physical_replication_slot('replica_slot');
+
+  primary-postgresql.conf: |
+    listen_addresses = '*'
+    wal_level = replica
+    max_wal_senders = 10
+    max_replication_slots = 10
+  primary-pg_hba.conf: |
+    local all all trust
+    host all all 127.0.0.1/32 trust
+    host all all ::1/128 trust
+    host replication replicator 0.0.0.0/0 md5
+    host all all 0.0.0.0/0 md5
+  replica-postgresql.conf: |
+    listen_addresses = '*'
+    hot_standby = on
+
+  config.py: |
+    # config.py
+    import os
+    from dataclasses import dataclass
+    
+    @dataclass
+    class Config:
+        # PostgreSQL Primary (for writes)
+        DB_PRIMARY_HOST = os.getenv('DB_PRIMARY_HOST', 'postgres-primary')
+        DB_PRIMARY_PORT = int(os.getenv('DB_PRIMARY_PORT', 5432))
+    
+        # PostgreSQL Replica (for reads)
+        DB_REPLICA_HOST = os.getenv('DB_REPLICA_HOST', 'postgres-replica')
+        DB_REPLICA_PORT = int(os.getenv('DB_REPLICA_PORT', 5432))
+    
+        DB_NAME = os.getenv('DB_NAME', 'urlshortener')
+        DB_USER = os.getenv('DB_USER', 'admin')
+        DB_PASSWORD = os.getenv('DB_PASSWORD', 'password')
+    
+        # Redis
+        REDIS_HOST = os.getenv('REDIS_HOST', 'redis')
+        REDIS_PORT = int(os.getenv('REDIS_PORT', 6379))
+        REDIS_TTL = int(os.getenv('REDIS_TTL', 3600))  # 1 hour cache
+    
+        # RabbitMQ
+        RABBITMQ_HOST = os.getenv('RABBITMQ_HOST', 'rabbitmq')
+        RABBITMQ_PORT = int(os.getenv('RABBITMQ_PORT', 5672))
+        RABBITMQ_USER = os.getenv('RABBITMQ_USER', 'guest')
+        RABBITMQ_PASSWORD = os.getenv('RABBITMQ_PASSWORD', 'guest')
+        RABBITMQ_QUEUE = os.getenv('RABBITMQ_QUEUE', 'click_events')
+    
+        # Rate Limiting
+        RATE_LIMIT_REQUESTS = int(os.getenv('RATE_LIMIT_REQUESTS', 10))
+        RATE_LIMIT_WINDOW = int(os.getenv('RATE_LIMIT_WINDOW', 60))
+    
+        # Base URLs and thingsandupands
+        BASE_URL = os.getenv('BASE_URL', 'http://localhost:5002/')
