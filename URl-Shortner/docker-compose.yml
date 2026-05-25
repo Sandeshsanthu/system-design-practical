@@ -258,13 +258,10 @@ services:
       - url-shortener-network
 
   nginx-cdn:
-    image: sandeshs/url-shortener-nginx-cdn:4d91847a148c4b9c20fc593f4ca84f73438d5edd
+    image: sandeshs/url-shortener-nginx-cdn:a48895ec3a0cfc03ea6727369ef84afec2e5f0ba
     container_name: nginx-cdn
     ports:
-      - "8080:80"
-    volumes:
-      - ./frontend:/usr/share/nginx/html:ro
-      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - "8080:8080" # FIXED: Maps host port 8080 to unprivileged container port 8080
     depends_on:
       write-service:
         condition: service_started
@@ -273,11 +270,12 @@ services:
     networks:
       - url-shortener-network
     healthcheck:
-      test: [ "CMD", "wget", "-q", "--spider", "http://localhost/nginx-health" ]
+      test: [ "CMD", "wget", "-q", "--spider", "http://localhost:8080/nginx-health" ]
       interval: 10s
       timeout: 5s
       retries: 3
     restart: unless-stopped
+
 
 volumes:
   postgres-primary-data:
