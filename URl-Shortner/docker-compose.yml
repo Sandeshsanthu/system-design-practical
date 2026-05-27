@@ -258,7 +258,7 @@ services:
       - url-shortener-network
 
   nginx-cdn:
-    image: sandeshs/url-shortener-nginx-cdn:01f8dd31af041809c71cf8f835c6172c05d7fd6b
+    image: sandeshs/url-shortener-nginx-cdn:831ae0dea3f937c64619dbb31e2314ab72a70d4f
     container_name: nginx-cdn
     ports:
       - "8080:8080" # FIXED: Maps host port 8080 to unprivileged container port 8080
