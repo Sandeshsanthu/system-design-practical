@@ -1,5 +1,0 @@
-FROM ubuntu:24.04
-ENV DEBIAN_FRONTEND=noninteractive
-RUN apt-get update && apt-get install -y chromium-browser --no-install-recommends && rm -rf /var/lib/apt/lists/*
-ENTRYPOINT [ "/usr/bin/chromium-browser" ]
-CMD [ "--no-sandbox", "--user-data-dir=/data" ]

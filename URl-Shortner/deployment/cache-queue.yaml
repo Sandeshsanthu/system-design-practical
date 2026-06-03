@@ -41,6 +41,9 @@ spec:
         name: redis-data
       spec:
         accessModes: [ "ReadWriteOnce" ]
+#        accessModes:
+#          - ReadWriteOnce
+#        storageClassName: eks-auto-ebs
         resources:
           requests:
             storage: 2Gi
@@ -109,6 +112,9 @@ spec:
         name: rabbitmq-data
       spec:
         accessModes: [ "ReadWriteOnce" ]
+#        accessModes:
+#          - ReadWriteOnce
+#        storageClassName: eks-auto-ebs
         resources:
           requests:
             storage: 5Gi

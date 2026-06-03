@@ -14,12 +14,45 @@ spec:
       labels:
         app: postgres-replica
     spec:
+      tolerations:
+        - key: "node.kubernetes.io/not-ready"
+          operator: "Exists"
+          effect: "NoExecute"
+        - key: "node.kubernetes.io/unreachable"
+          operator: "Exists"
+          effect: "NoExecute"
+      initContainers:
+        - name: fix-pgdata-permissions
+          image: postgres:15
+          # FIXED: Switched to root so chown/chmod actually work on the persistent volume
+          securityContext:
+            runAsUser: 0
+          command:
+            - sh
+            - -c
+            - |
+              mkdir -p /var/lib/postgresql/data/pgdata
+              chown -R 999:999 /var/lib/postgresql/data
+              chmod 700 /var/lib/postgresql/data/pgdata
+          volumeMounts:
+            - name: postgres-replica-data
+              mountPath: /var/lib/postgresql/data
       securityContext:
         runAsUser: 999
         fsGroup: 999
       containers:
         - name: postgres-replica
           image: postgres:15
+          resources:
+            requests:
+              cpu: "250m"
+              memory: "512Mi"
+            limits:
+              cpu: "1"
+              memory: "1Gi"
+          envFrom:
+            - secretRef:
+                name: postgres-secrets
           env:
             - name: POSTGRES_USER
               valueFrom:
@@ -56,7 +89,6 @@ spec:
                 sleep 5
                 
                 echo '📥 Starting pg_basebackup...'
-                # FIXED: Removed "-C" flag so it uses the pre-created "replica_slot" instead of trying to make a new one
                 PGPASSWORD=replicator_password pg_basebackup \
                   -h postgres-primary-headless \
                   -D "$PGDATA" \
@@ -82,13 +114,22 @@ spec:
                 echo '✅ Existing data found, starting in recovery mode'
               fi
               
+              # FIXED: Explicitly force correct folder permissions directly before starting engine
+              echo '🔒 Setting strict data directory permissions...'
+              chmod 700 "$PGDATA"
+
               echo '🚀 Starting PostgreSQL replica...'
               exec postgres -c config_file=/etc/postgresql/postgresql.conf
           readinessProbe:
             exec:
-              command: ["pg_isready", "-U", "admin", "-d", "urlshortener"]
-            initialDelaySeconds: 15
+              command:
+                - sh
+                - -c
+                - pg_isready -h 127.0.0.1 -p 5432 -U admin -d postgres
+            initialDelaySeconds: 20
             periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 6
       volumes:
         - name: config-files
           configMap:
@@ -98,6 +139,9 @@ spec:
         name: postgres-replica-data
       spec:
         accessModes: [ "ReadWriteOnce" ]
+#        accessModes:
+#        - ReadWriteOnce
+#        storageClassName: eks-auto-ebs
         resources:
           requests:
             storage: 10Gi
