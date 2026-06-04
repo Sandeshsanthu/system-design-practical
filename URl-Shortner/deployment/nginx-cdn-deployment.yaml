@@ -19,7 +19,7 @@ spec:
     spec:
       containers:
         - name: nginx-cdn
-          image: sandeshs/url-shortener-nginx-cdn:f79c7a5b7f3814ac44bcad4a55720a7063f4ec79
+          image: sandeshs/url-shortener-nginx-cdn:a4a3a4e4b34b3229399511e0f0b308f45e0f048a
           imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 8080
