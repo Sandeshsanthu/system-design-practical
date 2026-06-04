@@ -1,0 +1,49 @@
+# filename: url-shortener-ingress.yaml
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: url-shortener-ingress
+  namespace: url-shortener
+  annotations:
+    nginx.ingress.kubernetes.io/rewrite-target: /$2
+    nginx.ingress.kubernetes.io/use-regex: "true"
+spec:
+  ingressClassName: nginx
+  rules:
+  - http:
+      paths:
+      # API endpoint - routes /api/* to write-service
+      - path: /api(/|$)(.*)
+        pathType: ImplementationSpecific
+        backend:
+          service:
+            name: write-service
+            port:
+              number: 5001
+
+      # Analytics endpoint - routes /analytics/* to write-service
+      - path: /analytics(/|$)(.*)
+        pathType: ImplementationSpecific
+        backend:
+          service:
+            name: write-service
+            port:
+              number: 5001
+
+      # Short URL redirects - routes /{shortcode} to redirect-service
+      - path: /([a-zA-Z0-9]{5,10})
+        pathType: ImplementationSpecific
+        backend:
+          service:
+            name: redirect-service
+            port:
+              number: 5002
+
+      # Frontend - everything else goes to nginx-cdn
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: nginx-cdn
+            port:
+              number: 8080

@@ -3,6 +3,7 @@ kind: Deployment
 metadata:
   name: write-service
   namespace: url-shortener
+
 spec:
   replicas: 1
   selector:
@@ -15,6 +16,7 @@ spec:
     spec:
       containers:
         - name: write-service
+
           image: sandeshs/url-shortener-write-service:7a1453c4e582573160f7cdde8c46e5e802189913
           ports:
             - containerPort: 5001
@@ -22,6 +24,8 @@ spec:
           env:
             - name: PYTHONPATH
               value: "/app"
+            - name: BASE_URL
+              value: "http://localhost:8080/"
             # Postgres Write target routing map
             - name: DB_PRIMARY_HOST
               value: "postgres-write-router"

@@ -106,4 +106,4 @@ data:
         RATE_LIMIT_WINDOW = int(os.getenv('RATE_LIMIT_WINDOW', 60))
     
         # Base URLs and thingsandupands
-        BASE_URL = os.getenv('BASE_URL', 'http://localhost:5002/')
+        BASE_URL = os.getenv('BASE_URL', 'http://172.18.0.12:8080/') 
