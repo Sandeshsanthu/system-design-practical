@@ -17,7 +17,7 @@ spec:
       containers:
         - name: write-service
 
-          image: write-service:v6
+          image: sandeshs/url-shortener-write-service:743a8be7f28b6e47ff6ce98f006af7423a723869
           ports:
             - containerPort: 5001
               name: http

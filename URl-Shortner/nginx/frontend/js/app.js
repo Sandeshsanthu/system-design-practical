@@ -84,8 +84,7 @@ async function shortenUrl() {
         urlInput.value = '';
         createdByInput.value = '';
 
-        // Refresh global stats after creating a URL
-        loadGlobalStats();
+
 
     } catch (error) {
         console.error('Error:', error);
@@ -244,9 +243,3 @@ analyticsInput.addEventListener('keypress', (e) => {
 // ============================================
 // Initialize on Page Load
 // ============================================
-document.addEventListener('DOMContentLoaded', () => {
-    loadGlobalStats();
-
-    // Refresh stats every 30 seconds
-    setInterval(loadGlobalStats, 30000);
-});
