@@ -1,10 +1,11 @@
-apiVersion: apps/v1
-kind: Deployment
+apiVersion: argoproj.io/v1alpha1 # 1. Changed API to Argo Rollouts
+kind: Rollout                    # 2. Changed Kind from Deployment to Rollout
 metadata:
   name: analytics-worker
   namespace: url-shortener
 spec:
   replicas: 2
+  revisionHistoryLimit: 3
   selector:
     matchLabels:
       app: analytics-worker
@@ -13,14 +14,13 @@ spec:
       labels:
         app: analytics-worker
     spec:
-      # This init container guarantees the workers wait until RabbitMQ is accepting connections
       initContainers:
         - name: wait-for-rabbitmq
           image: busybox:1.36
           command: ['sh', '-c', 'until nc -z -w 2 rabbitmq 5672; do echo "⏳ Waiting for RabbitMQ broker to spin up..."; sleep 2; done; echo "✅ RabbitMQ is ready!"']
       containers:
         - name: analytics-worker
-          image: sandeshs/url-shortener-analytics-worker:743a8be7f28b6e47ff6ce98f006af7423a723869
+          image: sandeshs/url-shortener-analytics-worker:e2977650ccbdf7d67d1a58d7e5290d152de42ed3
           env:
             - name: PYTHONPATH
               value: "/app"
@@ -28,7 +28,6 @@ spec:
               value: "postgres-write-router"
             - name: DB_PRIMARY_PORT
               value: "5432"
-            # Overrides to bypass the Kubernetes discovery string conversion bugs
             - name: REDIS_PORT
               value: "6379"
             - name: RABBITMQ_PORT
@@ -63,3 +62,10 @@ spec:
         - name: app-config-volume
           configMap:
             name: postgres-configs
+
+  # 3. Automated 2-minute canary window configuration for workers
+  strategy:
+    canary:
+      steps:
+      - setWeight: 50           # Replaces 1 out of 2 workers with the new code version
+      - pause: { duration: 2m } # Runs mixed workers for 2 mins, then auto-promotes to 100%

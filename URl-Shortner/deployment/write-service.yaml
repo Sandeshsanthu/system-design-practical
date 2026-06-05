@@ -1,11 +1,11 @@
-apiVersion: apps/v1
-kind: Deployment
+apiVersion: argoproj.io/v1alpha1 # 1. Changed API to Argo Rollouts
+kind: Rollout                    # 2. Changed Kind from Deployment to Rollout
 metadata:
   name: write-service
   namespace: url-shortener
-
 spec:
   replicas: 1
+  revisionHistoryLimit: 3
   selector:
     matchLabels:
       app: write-service
@@ -16,8 +16,7 @@ spec:
     spec:
       containers:
         - name: write-service
-
-          image: sandeshs/url-shortener-write-service:743a8be7f28b6e47ff6ce98f006af7423a723869
+          image: sandeshs/url-shortener-write-service:e2977650ccbdf7d67d1a58d7e5290d152de42ed3
           ports:
             - containerPort: 5001
               name: http
@@ -26,24 +25,20 @@ spec:
               value: "/app"
             - name: BASE_URL
               value: "http://localhost:8080/"
-            # Postgres Write target routing map
             - name: DB_PRIMARY_HOST
               value: "postgres-write-router"
             - name: DB_PRIMARY_PORT
               value: "5432"
-            # Postgres Read replica map (adding this to ensure config validation handles smoothly)
             - name: DB_REPLICA_HOST
               value: "postgres-read-router"
             - name: DB_REPLICA_PORT
               value: "5432"
-            # Cache targeting properties
             - name: REDIS_HOST
               value: "redis"
             - name: REDIS_PORT
               value: "6379"
             - name: REDIS_TTL
               value: "3600"
-            # Queue broker targeting properties
             - name: RABBITMQ_HOST
               value: "rabbitmq"
             - name: RABBITMQ_PORT
@@ -54,7 +49,6 @@ spec:
               value: "guest"
             - name: RABBITMQ_QUEUE
               value: "click_events"
-            # Reusing credentials from your database secret map
             - name: DB_NAME
               valueFrom:
                 secretKeyRef: { name: postgres-secrets, key: POSTGRES_DB }
@@ -73,6 +67,15 @@ spec:
         - name: app-config-volume
           configMap:
             name: postgres-configs
+
+  # 3. Added Canary Deployment Strategy Options (Automated 2-minute window)
+  strategy:
+    canary:
+      maxSurge: 1          # Spin up 1 new temporary pod alongside the old one
+      maxUnavailable: 0    # Keep the old pod alive while checking the new one
+      steps:
+      - setWeight: 50      # Route traffic across both old and new versions
+      - pause: { duration: 2m } # System automatically promotes to 100% after 2 mins
 ---
 apiVersion: v1
 kind: Service

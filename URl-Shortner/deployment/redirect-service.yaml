@@ -1,10 +1,11 @@
-apiVersion: apps/v1
-kind: Deployment
+apiVersion: argoproj.io/v1alpha1
+kind: Rollout
 metadata:
   name: redirect-service
   namespace: url-shortener
 spec:
-  replicas: 1 # Scale up easily to handle redirect traffic surges
+  replicas: 1
+  revisionHistoryLimit: 3
   selector:
     matchLabels:
       app: redirect-service
@@ -15,7 +16,7 @@ spec:
     spec:
       containers:
         - name: redirect-service
-          image: sandeshs/url-shortener-redirect-service:743a8be7f28b6e47ff6ce98f006af7423a723869
+          image: sandeshs/url-shortener-redirect-service:e2977650ccbdf7d67d1a58d7e5290d152de42ed3
           ports:
             - containerPort: 5002
               name: http
@@ -24,19 +25,16 @@ spec:
               value: "/app"
             - name: BASE_URL
               value: "http://localhost:8080/"
-            # Route reads through the replica service proxy
             - name: DB_REPLICA_HOST
               value: "postgres-read-router"
             - name: DB_REPLICA_PORT
               value: "5432"
-            # Cache targeting properties
             - name: REDIS_HOST
               value: "redis"
             - name: REDIS_PORT
               value: "6379"
             - name: REDIS_TTL
               value: "3600"
-            # Queue broker targeting properties for click tracking analytics
             - name: RABBITMQ_HOST
               value: "rabbitmq"
             - name: RABBITMQ_PORT
@@ -47,9 +45,6 @@ spec:
               value: "guest"
             - name: RABBITMQ_QUEUE
               value: "click_events"
-            - name: BASE_URL
-              value: "http://localhost/"
-            # Reusing credentials from your database secret map
             - name: DB_NAME
               valueFrom:
                 secretKeyRef: { name: postgres-secrets, key: POSTGRES_DB }
@@ -68,6 +63,14 @@ spec:
         - name: app-config-volume
           configMap:
             name: postgres-configs
+
+  strategy:
+    canary:
+      maxSurge: 1
+      maxUnavailable: 0
+      steps:
+      - setWeight: 50
+      - pause: { duration: 2m }
 ---
 apiVersion: v1
 kind: Service
