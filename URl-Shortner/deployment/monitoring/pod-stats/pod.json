@@ -1,0 +1,271 @@
+{
+  "title": "Kubernetes Pod Restarts",
+  "uid": "pod-restarts",
+  "schemaVersion": 39,
+  "version": 2,
+  "refresh": "30s",
+  "time": {
+    "from": "now-6h",
+    "to": "now"
+  },
+  "templating": {
+    "list": [
+      {
+        "name": "namespace",
+        "type": "query",
+        "datasource": "PROMETHEUS_DS",
+        "query": "label_values(kube_pod_container_status_restarts_total{container!=\"POD\"}, namespace)",
+        "refresh": 1,
+        "includeAll": true,
+        "multi": true,
+        "allValue": ".*",
+        "current": {
+          "selected": true,
+          "text": "All",
+          "value": ".*"
+        }
+      },
+      {
+        "name": "pod",
+        "type": "query",
+        "datasource": "PROMETHEUS_DS",
+        "query": "label_values(kube_pod_container_status_restarts_total{namespace=~\"$namespace\",container!=\"POD\"}, pod)",
+        "refresh": 1,
+        "includeAll": true,
+        "multi": true,
+        "allValue": ".*",
+        "current": {
+          "selected": true,
+          "text": "All",
+          "value": ".*"
+        }
+      }
+    ]
+  },
+  "panels": [
+    {
+      "id": 1,
+      "type": "stat",
+      "title": "Current Cumulative Restarts",
+      "datasource": "PROMETHEUS_DS",
+      "targets": [
+        {
+          "refId": "A",
+          "instant": true,
+          "expr": "sum(kube_pod_container_status_restarts_total{namespace=~\"$namespace\",pod=~\"$pod\",container!=\"POD\"})"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 1 },
+              { "color": "red", "value": 5 }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": ["lastNotNull"],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "center"
+      },
+      "gridPos": { "h": 8, "w": 6, "x": 0, "y": 0 }
+    },
+    {
+      "id": 2,
+      "type": "stat",
+      "title": "Restarts in Selected Range",
+      "datasource": "PROMETHEUS_DS",
+      "targets": [
+        {
+          "refId": "A",
+          "instant": true,
+          "expr": "sum(increase(kube_pod_container_status_restarts_total{namespace=~\"$namespace\",pod=~\"$pod\",container!=\"POD\"}[$__range]))"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 1 },
+              { "color": "red", "value": 5 }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": ["lastNotNull"],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "center"
+      },
+      "gridPos": { "h": 8, "w": 6, "x": 6, "y": 0 }
+    },
+    {
+      "id": 3,
+      "type": "bargauge",
+      "title": "Top 15 Pods by Current Restarts",
+      "datasource": "PROMETHEUS_DS",
+      "targets": [
+        {
+          "refId": "A",
+          "instant": true,
+          "legendFormat": "{{namespace}}/{{pod}}",
+          "expr": "topk(15, sum by (namespace, pod) (kube_pod_container_status_restarts_total{namespace=~\"$namespace\",pod=~\"$pod\",container!=\"POD\"}))"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "min": 0
+        },
+        "overrides": []
+      },
+      "options": {
+        "displayMode": "basic",
+        "orientation": "horizontal",
+        "reduceOptions": {
+          "calcs": ["lastNotNull"],
+          "fields": "",
+          "values": false
+        },
+        "showUnfilled": true
+      },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 }
+    },
+    {
+      "id": 4,
+      "type": "timeseries",
+      "title": "Restarts Over Time by Pod",
+      "datasource": "PROMETHEUS_DS",
+      "targets": [
+        {
+          "refId": "A",
+          "instant": false,
+          "legendFormat": "{{namespace}}/{{pod}}",
+          "expr": "sum by (namespace, pod) (increase(kube_pod_container_status_restarts_total{namespace=~\"$namespace\",pod=~\"$pod\",container!=\"POD\"}[$__rate_interval]))"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "min": 0
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "gridPos": { "h": 10, "w": 24, "x": 0, "y": 8 }
+    },
+    {
+      "id": 5,
+      "type": "table",
+      "title": "Current Restarts by Pod",
+      "datasource": "PROMETHEUS_DS",
+      "targets": [
+        {
+          "refId": "A",
+          "instant": true,
+          "expr": "sum by (namespace, pod, container) (kube_pod_container_status_restarts_total{namespace=~\"$namespace\",pod=~\"$pod\",container!=\"POD\"})"
+        }
+      ],
+      "transformations": [
+        {
+          "id": "labelsToFields",
+          "options": {
+            "mode": "columns"
+          }
+        },
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {
+              "Time": true
+            },
+            "indexByName": {
+              "namespace": 0,
+              "pod": 1,
+              "container": 2,
+              "Value": 3
+            },
+            "renameByName": {
+              "Value": "Current Restarts"
+            }
+          }
+        }
+      ],
+      "options": {
+        "showHeader": true
+      },
+      "gridPos": { "h": 10, "w": 12, "x": 0, "y": 18 }
+    },
+    {
+      "id": 6,
+      "type": "table",
+      "title": "Restarts in Selected Range by Pod",
+      "datasource": "PROMETHEUS_DS",
+      "targets": [
+        {
+          "refId": "A",
+          "instant": true,
+          "expr": "sum by (namespace, pod, container) (increase(kube_pod_container_status_restarts_total{namespace=~\"$namespace\",pod=~\"$pod\",container!=\"POD\"}[$__range]))"
+        }
+      ],
+      "transformations": [
+        {
+          "id": "labelsToFields",
+          "options": {
+            "mode": "columns"
+          }
+        },
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {
+              "Time": true
+            },
+            "indexByName": {
+              "namespace": 0,
+              "pod": 1,
+              "container": 2,
+              "Value": 3
+            },
+            "renameByName": {
+              "Value": "Range Restarts"
+            }
+          }
+        }
+      ],
+      "options": {
+        "showHeader": true
+      },
+      "gridPos": { "h": 10, "w": 12, "x": 12, "y": 18 }
+    }
+  ]
+}

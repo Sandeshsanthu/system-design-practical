@@ -91,3 +91,7 @@ Write-Host ("="*70) -ForegroundColor Green
 
 Write-Host "`n📊 Service Status:" -ForegroundColor Cyan
 docker compose ps
+
+
+kubectl port-forward -n monitoring svc/grafana 3000:3000
+

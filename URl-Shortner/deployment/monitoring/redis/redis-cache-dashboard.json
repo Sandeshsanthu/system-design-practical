@@ -1,0 +1,280 @@
+{
+  "title": "Redis Cache - Complete Stats",
+  "uid": "redis-complete-stats",
+  "refresh": "30s",
+  "panels": [
+    {
+      "id": 1,
+      "type": "stat",
+      "title": "Hit Ratio %",
+      "gridPos": {"h": 6, "w": 6, "x": 0, "y": 0},
+      "targets": [{
+        "expr": "(redis_keyspace_hits_total / (redis_keyspace_hits_total + redis_keyspace_misses_total)) * 100",
+        "refId": "A"
+      }],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "decimals": 2,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {"value": 0, "color": "red"},
+              {"value": 70, "color": "yellow"},
+              {"value": 90, "color": "green"}
+            ]
+          }
+        }
+      },
+      "options": {
+        "colorMode": "background",
+        "textMode": "value_and_name"
+      }
+    },
+    {
+      "id": 2,
+      "type": "stat",
+      "title": "Total Hits",
+      "gridPos": {"h": 6, "w": 6, "x": 6, "y": 0},
+      "targets": [{
+        "expr": "redis_keyspace_hits_total",
+        "refId": "A"
+      }],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "color": {"mode": "palette-classic"}
+        }
+      },
+      "options": {
+        "textMode": "value_and_name",
+        "graphMode": "area"
+      }
+    },
+    {
+      "id": 3,
+      "type": "stat",
+      "title": "Total Misses",
+      "gridPos": {"h": 6, "w": 6, "x": 12, "y": 0},
+      "targets": [{
+        "expr": "redis_keyspace_misses_total",
+        "refId": "A"
+      }],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "color": {"fixedColor": "orange", "mode": "fixed"}
+        }
+      },
+      "options": {
+        "textMode": "value_and_name",
+        "graphMode": "area"
+      }
+    },
+    {
+      "id": 4,
+      "type": "stat",
+      "title": "Total Requests",
+      "gridPos": {"h": 6, "w": 6, "x": 18, "y": 0},
+      "targets": [{
+        "expr": "redis_keyspace_hits_total + redis_keyspace_misses_total",
+        "refId": "A"
+      }],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        }
+      },
+      "options": {
+        "textMode": "value_and_name",
+        "graphMode": "area",
+        "colorMode": "value"
+      }
+    },
+    {
+      "id": 5,
+      "type": "stat",
+      "title": "Hits/Second",
+      "gridPos": {"h": 5, "w": 6, "x": 0, "y": 6},
+      "targets": [{
+        "expr": "rate(redis_keyspace_hits_total[1m])",
+        "refId": "A"
+      }],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ops",
+          "decimals": 2
+        }
+      }
+    },
+    {
+      "id": 6,
+      "type": "stat",
+      "title": "Misses/Second",
+      "gridPos": {"h": 5, "w": 6, "x": 6, "y": 6},
+      "targets": [{
+        "expr": "rate(redis_keyspace_misses_total[1m])",
+        "refId": "A"
+      }],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ops",
+          "decimals": 2
+        }
+      }
+    },
+    {
+      "id": 7,
+      "type": "stat",
+      "title": "Keys in Cache",
+      "gridPos": {"h": 5, "w": 6, "x": 12, "y": 6},
+      "targets": [{
+        "expr": "sum(redis_db_keys)",
+        "refId": "A"
+      }],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        }
+      }
+    },
+    {
+      "id": 8,
+      "type": "stat",
+      "title": "Memory Used",
+      "gridPos": {"h": 5, "w": 6, "x": 18, "y": 6},
+      "targets": [{
+        "expr": "redis_memory_used_bytes",
+        "refId": "A"
+      }],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "bytes"
+        }
+      },
+      "options": {
+        "graphMode": "area"
+      }
+    },
+    {
+      "id": 9,
+      "type": "gauge",
+      "title": "Memory Usage %",
+      "gridPos": {"h": 6, "w": 8, "x": 0, "y": 11},
+      "targets": [{
+        "expr": "(redis_memory_used_bytes / (256 * 1024 * 1024)) * 100",
+        "refId": "A"
+      }],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "min": 0,
+          "max": 100,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {"value": 0, "color": "green"},
+              {"value": 70, "color": "yellow"},
+              {"value": 90, "color": "red"}
+            ]
+          }
+        }
+      }
+    },
+    {
+      "id": 10,
+      "type": "stat",
+      "title": "Connected Clients",
+      "gridPos": {"h": 6, "w": 4, "x": 8, "y": 11},
+      "targets": [{
+        "expr": "redis_connected_clients",
+        "refId": "A"
+      }],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        }
+      }
+    },
+    {
+      "id": 11,
+      "type": "stat",
+      "title": "Commands/sec",
+      "gridPos": {"h": 6, "w": 4, "x": 12, "y": 11},
+      "targets": [{
+        "expr": "rate(redis_commands_processed_total[1m])",
+        "refId": "A"
+      }],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ops",
+          "decimals": 1
+        }
+      }
+    },
+    {
+      "id": 12,
+      "type": "stat",
+      "title": "Evicted Keys",
+      "gridPos": {"h": 6, "w": 4, "x": 16, "y": 11},
+      "targets": [{
+        "expr": "redis_evicted_keys_total",
+        "refId": "A"
+      }],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {"value": 0, "color": "green"},
+              {"value": 1, "color": "red"}
+            ]
+          }
+        }
+      },
+      "options": {
+        "colorMode": "background"
+      }
+    },
+    {
+      "id": 13,
+      "type": "stat",
+      "title": "Expired Keys",
+      "gridPos": {"h": 6, "w": 4, "x": 20, "y": 11},
+      "targets": [{
+        "expr": "redis_expired_keys_total",
+        "refId": "A"
+      }],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        }
+      }
+    },
+    {
+      "id": 14,
+      "type": "timeseries",
+      "title": "Cache Performance Over Time",
+      "gridPos": {"h": 8, "w": 24, "x": 0, "y": 17},
+      "targets": [
+        {
+          "expr": "(redis_keyspace_hits_total / (redis_keyspace_hits_total + redis_keyspace_misses_total)) * 100",
+          "refId": "A",
+          "legendFormat": "Hit Ratio %"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "smooth",
+            "fillOpacity": 20,
+            "lineWidth": 2
+          }
+        }
+      }
+    }
+  ]
+}
