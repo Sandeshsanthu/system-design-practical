@@ -31,7 +31,7 @@ data:
           - source_labels: [__meta_kubernetes_node_name]
             regex: (.+)
             target_label: __metrics_path__
-            replacement: /api/v1/nodes/${1}/proxy/metrics/cadvisor
+            replacement: /api/v1/nodes/$1/proxy/metrics/cadvisor
           - source_labels: [__meta_kubernetes_node_name]
             target_label: node
 
@@ -83,6 +83,30 @@ data:
           - source_labels: [__meta_kubernetes_service_name]
             action: keep
             regex: redis-exporter
+    
+      # PostgreSQL metrics
+      - job_name: 'postgres-exporter'
+        kubernetes_sd_configs:
+          - role: service
+            namespaces:
+              names:
+                - url-shortener
+        relabel_configs:
+          - source_labels: [__meta_kubernetes_service_name]
+            action: keep
+            regex: postgres-exporter
+      
+      # RabbitMQ metrics
+      - job_name: 'rabbitmq-exporter'
+        kubernetes_sd_configs:
+          - role: service
+            namespaces:
+              names:
+                - url-shortener
+        relabel_configs:
+          - source_labels: [__meta_kubernetes_service_name]
+            action: keep
+            regex: rabbitmq-exporter
 
       # Prometheus self-monitoring
       - job_name: 'prometheus'
@@ -90,6 +114,7 @@ data:
           - targets: ['localhost:9090']
 
       # Auto-discover pods with prometheus.io/scrape annotation
+      # This will pick up write-service and any other annotated pods
       - job_name: 'kubernetes-pods'
         kubernetes_sd_configs:
           - role: pod
@@ -98,21 +123,30 @@ data:
                 - url-shortener
                 - monitoring
         relabel_configs:
+          # Only scrape pods with prometheus.io/scrape=true annotation
           - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_scrape]
             action: keep
             regex: true
+          # Use custom metrics path if specified, otherwise default to /metrics
           - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_path]
             action: replace
             target_label: __metrics_path__
             regex: (.+)
+          # Use custom port if specified in prometheus.io/port annotation
           - source_labels: [__address__, __meta_kubernetes_pod_annotation_prometheus_io_port]
             action: replace
             regex: ([^:]+)(?::\d+)?;(\d+)
             replacement: $1:$2
             target_label: __address__
+          # Copy all pod labels to metrics
           - action: labelmap
             regex: __meta_kubernetes_pod_label_(.+)
+          # Add namespace label
           - source_labels: [__meta_kubernetes_namespace]
             target_label: namespace
+          # Add pod name label
           - source_labels: [__meta_kubernetes_pod_name]
             target_label: pod
+          # Add container name label
+          - source_labels: [__meta_kubernetes_pod_container_name]
+            target_label: container

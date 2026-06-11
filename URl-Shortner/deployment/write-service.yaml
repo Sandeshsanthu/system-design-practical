@@ -1,5 +1,6 @@
-apiVersion: argoproj.io/v1alpha1 # 1. Changed API to Argo Rollouts
-kind: Rollout                    # 2. Changed Kind from Deployment to Rollout
+# filename: write-service-rollout.yaml
+apiVersion: argoproj.io/v1alpha1
+kind: Rollout
 metadata:
   name: write-service
   namespace: url-shortener
@@ -13,13 +14,31 @@ spec:
     metadata:
       labels:
         app: write-service
+      # ADD THESE ANNOTATIONS - This is what was missing!
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "5001"
+        prometheus.io/path: "/metrics"
     spec:
       containers:
         - name: write-service
-          image: sandeshs/url-shortener-write-service:e2977650ccbdf7d67d1a58d7e5290d152de42ed3
+          image: sandeshs/url-shortener-write-service:metrics-v1
           ports:
             - containerPort: 5001
               name: http
+          # Add health probes for better reliability
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 5001
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 5001
+            initialDelaySeconds: 5
+            periodSeconds: 5
           env:
             - name: PYTHONPATH
               value: "/app"
@@ -51,13 +70,19 @@ spec:
               value: "click_events"
             - name: DB_NAME
               valueFrom:
-                secretKeyRef: { name: postgres-secrets, key: POSTGRES_DB }
+                secretKeyRef:
+                  name: postgres-secrets
+                  key: POSTGRES_DB
             - name: DB_USER
               valueFrom:
-                secretKeyRef: { name: postgres-secrets, key: POSTGRES_USER }
+                secretKeyRef:
+                  name: postgres-secrets
+                  key: POSTGRES_USER
             - name: DB_PASSWORD
               valueFrom:
-                secretKeyRef: { name: postgres-secrets, key: POSTGRES_PASSWORD }
+                secretKeyRef:
+                  name: postgres-secrets
+                  key: POSTGRES_PASSWORD
           volumeMounts:
             - name: app-config-volume
               mountPath: /app/config.py
@@ -68,14 +93,15 @@ spec:
           configMap:
             name: postgres-configs
 
-  # 3. Added Canary Deployment Strategy Options (Automated 2-minute window)
   strategy:
     canary:
-      maxSurge: 1          # Spin up 1 new temporary pod alongside the old one
-      maxUnavailable: 0    # Keep the old pod alive while checking the new one
+      maxSurge: 1
+      maxUnavailable: 0
       steps:
-      - setWeight: 50      # Route traffic across both old and new versions
-      - pause: { duration: 2m } # System automatically promotes to 100% after 2 mins
+      - setWeight: 50
+      - pause:
+          duration: 2m
+
 ---
 apiVersion: v1
 kind: Service

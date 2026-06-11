@@ -13,9 +13,18 @@
       {
         "name": "namespace",
         "type": "query",
-        "datasource": "PROMETHEUS_DS",
-        "query": "label_values(kube_pod_container_status_restarts_total{container!=\"POD\"}, namespace)",
+        "datasource": {
+          "type": "prometheus",
+          "uid": "prometheus"
+        },
+        "definition": "label_values(kube_pod_container_status_restarts_total{container!=\"POD\"}, namespace)",
+        "query": {
+          "qryType": 0,
+          "query": "label_values(kube_pod_container_status_restarts_total{container!=\"POD\"}, namespace)",
+          "refId": "PrometheusVariableQuery"
+        },
         "refresh": 1,
+        "sort": 1,
         "includeAll": true,
         "multi": true,
         "allValue": ".*",
@@ -28,9 +37,18 @@
       {
         "name": "pod",
         "type": "query",
-        "datasource": "PROMETHEUS_DS",
-        "query": "label_values(kube_pod_container_status_restarts_total{namespace=~\"$namespace\",container!=\"POD\"}, pod)",
+        "datasource": {
+          "type": "prometheus",
+          "uid": "prometheus"
+        },
+        "definition": "label_values(kube_pod_container_status_restarts_total{namespace=~\"$namespace\",container!=\"POD\"}, pod)",
+        "query": {
+          "qryType": 0,
+          "query": "label_values(kube_pod_container_status_restarts_total{namespace=~\"$namespace\",container!=\"POD\"}, pod)",
+          "refId": "PrometheusVariableQuery"
+        },
         "refresh": 1,
+        "sort": 1,
         "includeAll": true,
         "multi": true,
         "allValue": ".*",
@@ -47,7 +65,10 @@
       "id": 1,
       "type": "stat",
       "title": "Current Cumulative Restarts",
-      "datasource": "PROMETHEUS_DS",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
       "targets": [
         {
           "refId": "A",
@@ -85,7 +106,10 @@
       "id": 2,
       "type": "stat",
       "title": "Restarts in Selected Range",
-      "datasource": "PROMETHEUS_DS",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
       "targets": [
         {
           "refId": "A",
@@ -123,7 +147,10 @@
       "id": 3,
       "type": "bargauge",
       "title": "Top 15 Pods by Current Restarts",
-      "datasource": "PROMETHEUS_DS",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
       "targets": [
         {
           "refId": "A",
@@ -155,7 +182,10 @@
       "id": 4,
       "type": "timeseries",
       "title": "Restarts Over Time by Pod",
-      "datasource": "PROMETHEUS_DS",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
       "targets": [
         {
           "refId": "A",
@@ -187,7 +217,10 @@
       "id": 5,
       "type": "table",
       "title": "Current Restarts by Pod",
-      "datasource": "PROMETHEUS_DS",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
       "targets": [
         {
           "refId": "A",
@@ -229,7 +262,10 @@
       "id": 6,
       "type": "table",
       "title": "Restarts in Selected Range by Pod",
-      "datasource": "PROMETHEUS_DS",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
       "targets": [
         {
           "refId": "A",
