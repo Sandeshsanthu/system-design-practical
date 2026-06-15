@@ -13,13 +13,26 @@ spec:
     metadata:
       labels:
         app: redirect-service
+      # FEATURE ADDITION: Annotations to let Prometheus discover your metrics endpoint
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "5002"
+        prometheus.io/path: "/metrics"
     spec:
       containers:
         - name: redirect-service
-          image: sandeshs/url-shortener-redirect-service:e2977650ccbdf7d67d1a58d7e5290d152de42ed3
+          image:  sandeshs/url-shortener-redirect-service:metrics
           ports:
             - containerPort: 5002
               name: http
+          # FEATURE ADDITION: Production Resource limits to track memory/CPU saturation accurately
+          resources:
+            requests:
+              memory: "64Mi"
+              cpu: "50m"
+            limits:
+              memory: "128Mi"
+              cpu: "200m"
           env:
             - name: PYTHONPATH
               value: "/app"
@@ -84,3 +97,4 @@ spec:
   ports:
     - port: 5002
       targetPort: 5002
+      name: http

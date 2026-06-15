@@ -84,25 +84,27 @@ data:
             action: keep
             regex: redis-exporter
     
-      # PostgreSQL metrics
+      # PostgreSQL metrics (FIXED: Expanded namespace array to locate your monitoring deployments)
       - job_name: 'postgres-exporter'
         kubernetes_sd_configs:
           - role: service
             namespaces:
               names:
                 - url-shortener
+                - monitoring
         relabel_configs:
           - source_labels: [__meta_kubernetes_service_name]
             action: keep
             regex: postgres-exporter
       
-      # RabbitMQ metrics
+      # RabbitMQ metrics (FIXED: Expanded namespace scope search arrays)
       - job_name: 'rabbitmq-exporter'
         kubernetes_sd_configs:
           - role: service
             namespaces:
               names:
                 - url-shortener
+                - monitoring
         relabel_configs:
           - source_labels: [__meta_kubernetes_service_name]
             action: keep
@@ -114,7 +116,7 @@ data:
           - targets: ['localhost:9090']
 
       # Auto-discover pods with prometheus.io/scrape annotation
-      # This will pick up write-service and any other annotated pods
+      # This completely automatically scrapes both write-service and redirect-service!
       - job_name: 'kubernetes-pods'
         kubernetes_sd_configs:
           - role: pod

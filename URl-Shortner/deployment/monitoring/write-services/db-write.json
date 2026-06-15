@@ -1,0 +1,438 @@
+{
+  "title": "URL Shortener - Full Stack Production Monitor",
+  "uid": "url-shortener-fullstack-production",
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "10s",
+  "time": {
+    "from": "now-1h",
+    "to": "now"
+  },
+  "templating": {
+    "list": [
+      {
+        "name": "DS_PROMETHEUS",
+        "type": "datasource",
+        "query": "prometheus",
+        "label": "Data Source",
+        "refresh": 1,
+        "hide": 0,
+        "multi": false,
+        "current": {}
+      },
+      {
+        "name": "pod",
+        "type": "query",
+        "datasource": {
+          "type": "prometheus",
+          "uid": "${DS_PROMETHEUS}"
+        },
+        "definition": "label_values(write_service_requests_total, pod)",
+        "query": {
+          "qryType": 0,
+          "query": "label_values(write_service_requests_total, pod)",
+          "refId": "PodVariableQuery"
+        },
+        "refresh": 1,
+        "sort": 1,
+        "includeAll": true,
+        "multi": true,
+        "allValue": ".*",
+        "current": {
+          "selected": true,
+          "text": "All",
+          "value": ".*"
+        }
+      },
+      {
+        "name": "endpoint",
+        "type": "query",
+        "datasource": {
+          "type": "prometheus",
+          "uid": "${DS_PROMETHEUS}"
+        },
+        "definition": "label_values(write_service_requests_total, endpoint)",
+        "query": {
+          "qryType": 0,
+          "query": "label_values(write_service_requests_total, endpoint)",
+          "refId": "EndpointVariableQuery"
+        },
+        "refresh": 1,
+        "sort": 1,
+        "includeAll": true,
+        "multi": true,
+        "allValue": ".*",
+        "current": {
+          "selected": true,
+          "text": "All",
+          "value": ".*"
+        }
+      }
+    ]
+  },
+  "panels": [
+    {
+      "id": 100,
+      "type": "row",
+      "title": "🎯 Key Performance Indicators",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 0 },
+      "collapsed": false
+    },
+    {
+      "id": 1,
+      "type": "stat",
+      "title": "Total URLs Created",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${DS_PROMETHEUS}"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "instant": true,
+          "expr": "sum(write_service_urls_created_total)"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null }
+            ]
+          }
+        }
+      },
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"] },
+        "colorMode": "value",
+        "graphMode": "area"
+      },
+      "gridPos": { "h": 5, "w": 4, "x": 0, "y": 1 }
+    },
+    {
+      "id": 2,
+      "type": "gauge",
+      "title": "Success Rate SLA",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${DS_PROMETHEUS}"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum(rate(write_service_requests_total{status=~\"2..|3..\"}[1m])) / (sum(rate(write_service_requests_total[1m])) + 0.0001) * 100"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "min": 0,
+          "max": 100,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "red", "value": null },
+              { "color": "yellow", "value": 95 },
+              { "color": "green", "value": 99.5 }
+            ]
+          }
+        }
+      },
+      "gridPos": { "h": 5, "w": 4, "x": 4, "y": 1 }
+    },
+    {
+      "id": 3,
+      "type": "stat",
+      "title": "Average DB Response Time",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${DS_PROMETHEUS}"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "instant": true,
+          "expr": "(rate(write_service_request_duration_seconds_sum{pod=~\"$pod\"}[2m]) / (rate(write_service_request_duration_seconds_count{pod=~\"$pod\"}[2m]) + 0.0001)) * 1000"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ms",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 50 },
+              { "color": "red", "value": 200 }
+            ]
+          }
+        }
+      },
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"] },
+        "colorMode": "value",
+        "graphMode": "area"
+      },
+      "gridPos": { "h": 5, "w": 5, "x": 8, "y": 1 }
+    },
+    {
+      "id": 4,
+      "type": "stat",
+      "title": "p95 DB Latency",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${DS_PROMETHEUS}"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "instant": true,
+          "expr": "histogram_quantile(0.95, sum(rate(write_service_request_duration_seconds_bucket{pod=~\"$pod\"}[2m])) by (le)) * 1000"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ms",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 100 },
+              { "color": "red", "value": 300 }
+            ]
+          }
+        }
+      },
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"] },
+        "colorMode": "value",
+        "graphMode": "area"
+      },
+      "gridPos": { "h": 5, "w": 6, "x": 13, "y": 1 }
+    },
+    {
+      "id": 5,
+      "type": "stat",
+      "title": "p99 Worst-Case Latency",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${DS_PROMETHEUS}"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "instant": true,
+          "expr": "histogram_quantile(0.99, sum(rate(write_service_request_duration_seconds_bucket{pod=~\"$pod\"}[2m])) by (le)) * 1000"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ms",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 150 },
+              { "color": "red", "value": 500 }
+            ]
+          }
+        }
+      },
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"] },
+        "colorMode": "value",
+        "graphMode": "area"
+      },
+      "gridPos": { "h": 5, "w": 5, "x": 19, "y": 1 }
+    },
+    {
+      "id": 200,
+      "type": "row",
+      "title": "📊 Request Metrics & Throughput",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 6 },
+      "collapsed": false
+    },
+    {
+      "id": 10,
+      "type": "timeseries",
+      "title": "Request Rate by Endpoint (Throughput)",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${DS_PROMETHEUS}"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "legendFormat": "{{endpoint}}",
+          "expr": "sum(rate(write_service_requests_total{pod=~\"$pod\",endpoint=~\"$endpoint\"}[1m])) by (endpoint)"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "rps",
+          "min": 0
+        }
+      },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 7 }
+    },
+    {
+      "id": 11,
+      "type": "timeseries",
+      "title": "Database Query Load vs. Latency",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${DS_PROMETHEUS}"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "legendFormat": "Queries/sec",
+          "expr": "sum(rate(write_service_requests_total{pod=~\"$pod\"}[1m]))"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "rps",
+          "min": 0
+        }
+      },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 7 }
+    },
+    {
+      "id": 300,
+      "type": "row",
+      "title": "🗄️ Database Performance & Latency",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 15 },
+      "collapsed": false
+    },
+    {
+      "id": 20,
+      "type": "timeseries",
+      "title": "DB Latency Percentiles (p50 / p95 / p99)",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${DS_PROMETHEUS}"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "legendFormat": "p50 (Median)",
+          "expr": "histogram_quantile(0.50, sum(rate(write_service_request_duration_seconds_bucket{pod=~\"$pod\",endpoint=~\"$endpoint\"}[5m])) by (le)) * 1000"
+        },
+        {
+          "refId": "B",
+          "legendFormat": "p95 (Tail Latency)",
+          "expr": "histogram_quantile(0.95, sum(rate(write_service_request_duration_seconds_bucket{pod=~\"$pod\",endpoint=~\"$endpoint\"}[5m])) by (le)) * 1000"
+        },
+        {
+          "refId": "C",
+          "legendFormat": "p99 (Worst Case)",
+          "expr": "histogram_quantile(0.99, sum(rate(write_service_request_duration_seconds_bucket{pod=~\"$pod\",endpoint=~\"$endpoint\"}[5m])) by (le)) * 1000"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ms",
+          "min": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 200 },
+              { "color": "red", "value": 500 }
+            ]
+          }
+        }
+      },
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 16 }
+    },
+    {
+      "id": 400,
+      "type": "row",
+      "title": "💻 Application Resources",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 24 },
+      "collapsed": false
+    },
+    {
+      "id": 30,
+      "type": "timeseries",
+      "title": "Application Memory Usage (RSS)",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${DS_PROMETHEUS}"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "legendFormat": "{{pod}}",
+          "expr": "sum({__name__=~\"process_resident_memory_bytes|go_memstats_alloc_bytes|nodejs_heap_size_total_bytes\", pod=~\"$pod\"}) by (pod)"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "bytes",
+          "min": 0
+        }
+      },
+      "gridPos": { "h": 7, "w": 12, "x": 0, "y": 25 }
+    },
+    {
+      "id": 31,
+      "type": "timeseries",
+      "title": "Application CPU Utilization",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${DS_PROMETHEUS}"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "legendFormat": "{{pod}}",
+          "expr": "sum(rate({__name__=~\"process_cpu_seconds_total\"}[2m])) by (pod)"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "min": 0
+        }
+      },
+      "gridPos": { "h": 7, "w": 12, "x": 12, "y": 25 }
+    },
+    {
+      "id": 500,
+      "type": "row",
+      "title": "⚠️ Errors & Failures",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 32 },
+      "collapsed": false
+    },
+    {
+      "id": 40,
+      "type": "timeseries",
+      "title": "HTTP Error Rates (4xx Client / 5xx Server)",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${DS_PROMETHEUS}"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "legendFormat": "Status {{status}}",
+          "expr": "sum(rate(write_service_requests_total{status!~\"2..|3..\",pod=~\"$pod\"}[1m])) by (status)"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "rps",
+          "min": 0
+        }
+      },
+      "gridPos": { "h": 7, "w": 24, "x": 0, "y": 33 }
+    }
+  ]
+}

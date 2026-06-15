@@ -1,0 +1,627 @@
+{
+  "title": "URL Shortener - Redirect Service Full Stack",
+  "uid": "url-shortener-redirect-fullstack",
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "10s",
+  "time": {
+    "from": "now-1h",
+    "to": "now"
+  },
+  "templating": {
+    "list": [
+      {
+        "name": "DS_PROMETHEUS",
+        "type": "datasource",
+        "query": "prometheus",
+        "label": "Data Source",
+        "refresh": 1,
+        "hide": 0,
+        "multi": false,
+        "current": {}
+      },
+      {
+        "name": "pod",
+        "type": "query",
+        "datasource": {
+          "type": "prometheus",
+          "uid": "${DS_PROMETHEUS}"
+        },
+        "definition": "label_values(redirect_service_requests_total, pod)",
+        "query": {
+          "qryType": 0,
+          "query": "label_values(redirect_service_requests_total, pod)",
+          "refId": "PodVariableQuery"
+        },
+        "refresh": 1,
+        "sort": 1,
+        "includeAll": true,
+        "multi": true,
+        "allValue": ".*",
+        "current": {
+          "selected": true,
+          "text": "All",
+          "value": ".*"
+        }
+      },
+      {
+        "name": "endpoint",
+        "type": "query",
+        "datasource": {
+          "type": "prometheus",
+          "uid": "${DS_PROMETHEUS}"
+        },
+        "definition": "label_values(redirect_service_requests_total, endpoint)",
+        "query": {
+          "qryType": 0,
+          "query": "label_values(redirect_service_requests_total, endpoint)",
+          "refId": "EndpointVariableQuery"
+        },
+        "refresh": 1,
+        "sort": 1,
+        "includeAll": true,
+        "multi": true,
+        "allValue": ".*",
+        "current": {
+          "selected": true,
+          "text": "All",
+          "value": ".*"
+        }
+      }
+    ]
+  },
+  "panels": [
+    {
+      "id": 100,
+      "type": "row",
+      "title": "🎯 Key Performance Indicators",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 0 },
+      "collapsed": false
+    },
+    {
+      "id": 1,
+      "type": "stat",
+      "title": "Total Redirects Served",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${DS_PROMETHEUS}"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "instant": true,
+          "expr": "sum(redirect_service_redirects_total)"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null }
+            ]
+          }
+        }
+      },
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"] },
+        "colorMode": "value",
+        "graphMode": "area"
+      },
+      "gridPos": { "h": 5, "w": 4, "x": 0, "y": 1 }
+    },
+    {
+      "id": 2,
+      "type": "gauge",
+      "title": "Success Rate SLA",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${DS_PROMETHEUS}"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum(rate(redirect_service_requests_total{status=~\"2..|3..\"}[1m])) / (sum(rate(redirect_service_requests_total[1m])) + 0.0001) * 100"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "min": 0,
+          "max": 100,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "red", "value": null },
+              { "color": "yellow", "value": 95 },
+              { "color": "green", "value": 99.5 }
+            ]
+          }
+        }
+      },
+      "gridPos": { "h": 5, "w": 4, "x": 4, "y": 1 }
+    },
+    {
+      "id": 3,
+      "type": "stat",
+      "title": "Redis Cache Hit Rate",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${DS_PROMETHEUS}"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "instant": true,
+          "expr": "rate(redirect_service_cache_hits_total[2m]) / (rate(redirect_service_cache_hits_total[2m]) + rate(redirect_service_cache_misses_total[2m]) + 0.0001) * 100"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "min": 0,
+          "max": 100,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "red", "value": null },
+              { "color": "yellow", "value": 80 },
+              { "color": "green", "value": 95 }
+            ]
+          }
+        }
+      },
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"] },
+        "colorMode": "value",
+        "graphMode": "area"
+      },
+      "gridPos": { "h": 5, "w": 4, "x": 8, "y": 1 }
+    },
+    {
+      "id": 4,
+      "type": "stat",
+      "title": "Average Response Time",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${DS_PROMETHEUS}"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "instant": true,
+          "expr": "(rate(redirect_service_request_duration_seconds_sum{pod=~\"$pod\"}[2m]) / (rate(redirect_service_request_duration_seconds_count{pod=~\"$pod\"}[2m]) + 0.0001)) * 1000"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ms",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 20 },
+              { "color": "red", "value": 100 }
+            ]
+          }
+        }
+      },
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"] },
+        "colorMode": "value",
+        "graphMode": "area"
+      },
+      "gridPos": { "h": 5, "w": 4, "x": 12, "y": 1 }
+    },
+    {
+      "id": 5,
+      "type": "stat",
+      "title": "p95 Latency",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${DS_PROMETHEUS}"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "instant": true,
+          "expr": "histogram_quantile(0.95, sum(rate(redirect_service_request_duration_seconds_bucket{pod=~\"$pod\"}[2m])) by (le)) * 1000"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ms",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 50 },
+              { "color": "red", "value": 150 }
+            ]
+          }
+        }
+      },
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"] },
+        "colorMode": "value",
+        "graphMode": "area"
+      },
+      "gridPos": { "h": 5, "w": 4, "x": 16, "y": 1 }
+    },
+    {
+      "id": 6,
+      "type": "stat",
+      "title": "p99 Worst-Case",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${DS_PROMETHEUS}"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "instant": true,
+          "expr": "histogram_quantile(0.99, sum(rate(redirect_service_request_duration_seconds_bucket{pod=~\"$pod\"}[2m])) by (le)) * 1000"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ms",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 100 },
+              { "color": "red", "value": 200 }
+            ]
+          }
+        }
+      },
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"] },
+        "colorMode": "value",
+        "graphMode": "area"
+      },
+      "gridPos": { "h": 5, "w": 4, "x": 20, "y": 1 }
+    },
+    {
+      "id": 200,
+      "type": "row",
+      "title": "📊 Request Metrics & Throughput",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 6 },
+      "collapsed": false
+    },
+    {
+      "id": 10,
+      "type": "timeseries",
+      "title": "Request Rate by Endpoint (Throughput)",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${DS_PROMETHEUS}"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "legendFormat": "{{endpoint}}",
+          "expr": "sum(rate(redirect_service_requests_total{pod=~\"$pod\",endpoint=~\"$endpoint\"}[1m])) by (endpoint)"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "rps",
+          "min": 0
+        }
+      },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 7 }
+    },
+    {
+      "id": 11,
+      "type": "timeseries",
+      "title": "Redirect Service Load",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${DS_PROMETHEUS}"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "legendFormat": "Redirects/sec",
+          "expr": "sum(rate(redirect_service_redirects_total[1m]))"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "rps",
+          "min": 0
+        }
+      },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 7 }
+    },
+    {
+      "id": 300,
+      "type": "row",
+      "title": "⚡ Redis Cache Performance",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 15 },
+      "collapsed": false
+    },
+    {
+      "id": 20,
+      "type": "timeseries",
+      "title": "Redis Cache Hit Rate Over Time",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${DS_PROMETHEUS}"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "legendFormat": "Hit Rate %",
+          "expr": "rate(redirect_service_cache_hits_total[1m]) / (rate(redirect_service_cache_hits_total[1m]) + rate(redirect_service_cache_misses_total[1m]) + 0.0001) * 100"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "min": 0,
+          "max": 100,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "red", "value": null },
+              { "color": "yellow", "value": 80 },
+              { "color": "green", "value": 95 }
+            ]
+          }
+        }
+      },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 16 }
+    },
+    {
+      "id": 21,
+      "type": "timeseries",
+      "title": "Cache Hits vs Misses (Request Distribution)",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${DS_PROMETHEUS}"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "legendFormat": "Cache Hits",
+          "expr": "rate(redirect_service_cache_hits_total[1m])"
+        },
+        {
+          "refId": "B",
+          "legendFormat": "Cache Misses (DB Fallback)",
+          "expr": "rate(redirect_service_cache_misses_total[1m])"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "rps",
+          "min": 0
+        }
+      },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 16 }
+    },
+    {
+      "id": 22,
+      "type": "timeseries",
+      "title": "Redis Cache Latency",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${DS_PROMETHEUS}"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "legendFormat": "Cache Response Time",
+          "expr": "(rate(redirect_service_cache_duration_seconds_sum[2m]) / (rate(redirect_service_cache_duration_seconds_count[2m]) + 0.0001)) * 1000"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ms",
+          "min": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 5 },
+              { "color": "red", "value": 20 }
+            ]
+          }
+        }
+      },
+      "gridPos": { "h": 7, "w": 12, "x": 0, "y": 24 }
+    },
+    {
+      "id": 23,
+      "type": "timeseries",
+      "title": "Database Fallback Latency",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${DS_PROMETHEUS}"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "legendFormat": "DB Query Time",
+          "expr": "(rate(redirect_service_db_query_duration_seconds_sum[2m]) / (rate(redirect_service_db_query_duration_seconds_count[2m]) + 0.0001)) * 1000"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ms",
+          "min": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 50 },
+              { "color": "red", "value": 100 }
+            ]
+          }
+        }
+      },
+      "gridPos": { "h": 7, "w": 12, "x": 12, "y": 24 }
+    },
+    {
+      "id": 400,
+      "type": "row",
+      "title": "🗄️ Response Time Breakdown",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 31 },
+      "collapsed": false
+    },
+    {
+      "id": 30,
+      "type": "timeseries",
+      "title": "Latency Percentiles (p50 / p95 / p99)",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${DS_PROMETHEUS}"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "legendFormat": "p50 (Median)",
+          "expr": "histogram_quantile(0.50, sum(rate(redirect_service_request_duration_seconds_bucket{pod=~\"$pod\",endpoint=~\"$endpoint\"}[5m])) by (le)) * 1000"
+        },
+        {
+          "refId": "B",
+          "legendFormat": "p95 (Tail Latency)",
+          "expr": "histogram_quantile(0.95, sum(rate(redirect_service_request_duration_seconds_bucket{pod=~\"$pod\",endpoint=~\"$endpoint\"}[5m])) by (le)) * 1000"
+        },
+        {
+          "refId": "C",
+          "legendFormat": "p99 (Worst Case)",
+          "expr": "histogram_quantile(0.99, sum(rate(redirect_service_request_duration_seconds_bucket{pod=~\"$pod\",endpoint=~\"$endpoint\"}[5m])) by (le)) * 1000"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ms",
+          "min": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 50 },
+              { "color": "red", "value": 150 }
+            ]
+          }
+        }
+      },
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 32 }
+    },
+    {
+      "id": 500,
+      "type": "row",
+      "title": "💻 Application Resources",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 40 },
+      "collapsed": false
+    },
+    {
+      "id": 40,
+      "type": "timeseries",
+      "title": "Application Memory Usage (RSS)",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${DS_PROMETHEUS}"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "legendFormat": "{{pod}}",
+          "expr": "sum({__name__=~\"process_resident_memory_bytes|go_memstats_alloc_bytes|nodejs_heap_size_total_bytes\", pod=~\"$pod\"}) by (pod)"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "bytes",
+          "min": 0
+        }
+      },
+      "gridPos": { "h": 7, "w": 12, "x": 0, "y": 41 }
+    },
+    {
+      "id": 41,
+      "type": "timeseries",
+      "title": "Application CPU Utilization",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${DS_PROMETHEUS}"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "legendFormat": "{{pod}}",
+          "expr": "sum(rate({__name__=~\"process_cpu_seconds_total\"}[2m])) by (pod)"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "min": 0
+        }
+      },
+      "gridPos": { "h": 7, "w": 12, "x": 12, "y": 41 }
+    },
+    {
+      "id": 600,
+      "type": "row",
+      "title": "⚠️ Errors & Failures",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 48 },
+      "collapsed": false
+    },
+    {
+      "id": 50,
+      "type": "timeseries",
+      "title": "HTTP Error Rates (4xx Client / 5xx Server)",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${DS_PROMETHEUS}"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "legendFormat": "Status {{status}}",
+          "expr": "sum(rate(redirect_service_requests_total{status!~\"2..|3..\",pod=~\"$pod\"}[1m])) by (status)"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "rps",
+          "min": 0
+        }
+      },
+      "gridPos": { "h": 7, "w": 12, "x": 0, "y": 49 }
+    },
+    {
+      "id": 51,
+      "type": "timeseries",
+      "title": "404 Not Found Rate (Missing URLs)",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${DS_PROMETHEUS}"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "legendFormat": "404 Errors",
+          "expr": "sum(rate(redirect_service_requests_total{status=\"404\"}[1m]))"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "rps",
+          "min": 0
+        }
+      },
+      "gridPos": { "h": 7, "w": 12, "x": 12, "y": 49 }
+    }
+  ]
+}
