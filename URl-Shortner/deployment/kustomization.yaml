@@ -1,0 +1,36 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: url-shortener
+
+resources:
+  # Infrastructure
+  - base-infra.yml
+  - configs.yaml
+  - cache-queue.yaml
+
+  # Database
+  - db-services.yaml
+  - postgres-primary.yaml
+  - postgres-replica.yaml
+
+  # Application Services
+  - write-service.yaml
+  - redirect-service.yaml
+  - analytics-workers.yaml
+  - nginx-cdn-deployment.yaml
+
+# Images with commit SHA tags for full traceability
+images:
+  - name: sandeshs/url-shortener-write-service
+    newName: sandeshs/url-shortener-write-service
+    newTag: placeholder  # Will be replaced by CI/CD with commit SHA
+  - name: sandeshs/url-shortener-redirect-service
+    newName: sandeshs/url-shortener-redirect-service
+    newTag: placeholder
+  - name: sandeshs/url-shortener-analytics-worker
+    newName: sandeshs/url-shortener-analytics-worker
+    newTag: placeholder
+  - name: sandeshs/url-shortener-nginx-cdn
+    newName: sandeshs/url-shortener-nginx-cdn
+    newTag: placeholder
