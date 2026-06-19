@@ -24,13 +24,13 @@ resources:
 images:
 - name: sandeshs/url-shortener-analytics-worker
   newName: sandeshs/url-shortener-analytics-worker
-  newTag: 2d475710171b00f5ef775d9b58d349f92cef9f4d
+  newTag: 04b2f43241e279efc06380fc07995af76dde763f
 - name: sandeshs/url-shortener-nginx-cdn
   newName: sandeshs/url-shortener-nginx-cdn
-  newTag: 2d475710171b00f5ef775d9b58d349f92cef9f4d
+  newTag: 04b2f43241e279efc06380fc07995af76dde763f
 - name: sandeshs/url-shortener-redirect-service
   newName: sandeshs/url-shortener-redirect-service
-  newTag: 2d475710171b00f5ef775d9b58d349f92cef9f4d
+  newTag: 04b2f43241e279efc06380fc07995af76dde763f
 - name: sandeshs/url-shortener-write-service
   newName: sandeshs/url-shortener-write-service
-  newTag: 2d475710171b00f5ef775d9b58d349f92cef9f4d
+  newTag: 04b2f43241e279efc06380fc07995af76dde763f
