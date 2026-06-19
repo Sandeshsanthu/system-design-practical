@@ -20,7 +20,7 @@ spec:
           command: ['sh', '-c', 'until nc -z -w 2 rabbitmq 5672; do echo "⏳ Waiting for RabbitMQ broker to spin up..."; sleep 2; done; echo "✅ RabbitMQ is ready!"']
       containers:
         - name: analytics-worker
-          image: sandeshs/url-shortener-analytics-worker:e2977650ccbdf7d67d1a58d7e5290d152de42ed3
+          image: sandeshs/url-shortener-analytics-worker
           env:
             - name: PYTHONPATH
               value: "/app"
