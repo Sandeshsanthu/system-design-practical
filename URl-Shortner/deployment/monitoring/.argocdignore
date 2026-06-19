@@ -1,0 +1,8 @@
+# filename: .argocdignore
+# Ignore Grafana dashboard JSON files
+*.json
+error.json
+
+# Ignore any other non-Kubernetes files
+*.md
+*.txt
