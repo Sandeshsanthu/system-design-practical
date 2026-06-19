@@ -21,7 +21,7 @@ spec:
     spec:
       containers:
         - name: redirect-service
-          image:  sandeshs/url-shortener-redirect-service:metrics
+          image:  sandeshs/url-shortener-redirect-service:ab368c137ce74a008f68fead1f0abdbbd0b2ff05
           ports:
             - containerPort: 5002
               name: http
