@@ -70,7 +70,8 @@ def create_event(num_seats=10):
             print(f"✅ Event created: {event['event_name']}")
             print(f"   Event ID: {event['event_id']}")
             print(f"   Total Seats: {event['total_seats']}")
-            print(f"   Available Seats: {event['available_seats']}")
+            # FIX: Fallback value if 'available_seats' missing from API response
+            print(f"   Available Seats: {event.get('available_seats', 'N/A')}")
             return event['event_id']
         else:
             print(f"❌ Failed to create event")
@@ -168,12 +169,13 @@ def verify_data(event_id):
         seats = seats_response.json()
 
         print(f"   Event total_seats: {event['total_seats']}")
-        print(f"   Event available_seats: {event['available_seats']}")
+        # FIX: Fallback value if 'available_seats' missing from API response
+        print(f"   Event available_seats: {event.get('available_seats', 'N/A')}")
         print(f"   Actual seats created: {len(seats)}")
 
         # Count by status
-        available = sum(1 for s in seats if s['status'] == 'available')
-        booked = sum(1 for s in seats if s['status'] == 'booked')
+        available = sum(1 for s in seats if s.get('status') == 'available')
+        booked = sum(1 for s in seats if s.get('status') == 'booked')
 
         print(f"   Seats by status:")
         print(f"     - Available: {available}")
@@ -203,7 +205,7 @@ def main():
         sys.exit(1)
 
     # Create event with 100 seats
-    num_seats = 100
+    num_seats = 20
     event_id = create_event(num_seats)
     if not event_id:
         print("\n❌ Failed to create event. Exiting.")
