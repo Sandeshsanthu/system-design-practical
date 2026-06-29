@@ -13,6 +13,7 @@ from fastapi import HTTPException
 from sqlalchemy import and_
 from sqlalchemy.orm import Session
 
+from app.hold import HoldService
 from app.lock_service import acquire_lock
 from app.websocket_manager import manager
 from models.models import (
@@ -32,8 +33,6 @@ logger = logging.getLogger(__name__)
 
 
 class PaymentService:
-    """Service to handle booking, payment, and refund flows safely."""
-
     @staticmethod
     def _normalize_payment_method(payment_method: Any) -> str:
         if hasattr(payment_method, "value"):
@@ -44,7 +43,6 @@ class PaymentService:
     def _normalize_status(value: Any) -> str:
         if hasattr(value, "value"):
             return str(value.value).strip().lower()
-
         normalized = str(value).strip().lower()
         if "." in normalized:
             normalized = normalized.split(".")[-1]
@@ -57,10 +55,7 @@ class PaymentService:
         try:
             return uuid.UUID(str(value))
         except Exception as exc:
-            raise HTTPException(
-                status_code=400,
-                detail=f"Invalid {field_name}: {value}",
-            ) from exc
+            raise HTTPException(status_code=400, detail=f"Invalid {field_name}: {value}") from exc
 
     @staticmethod
     def _to_float(value: Any) -> float:
@@ -83,10 +78,7 @@ class PaymentService:
         try:
             return PaymentMethod(payment_method)
         except ValueError as exc:
-            raise HTTPException(
-                status_code=400,
-                detail=f"Invalid payment method: {payment_method}",
-            ) from exc
+            raise HTTPException(status_code=400, detail=f"Invalid payment method: {payment_method}") from exc
 
     @staticmethod
     def _create_audit_log(
@@ -112,6 +104,7 @@ class PaymentService:
         seat_id: Any,
         payment_method: str,
         payment_details: dict,
+        hold_token: str,
         idempotency_key: str = None,
     ) -> Tuple[Booking, Optional[Payment], str]:
         user_uuid = PaymentService._to_uuid(user_id, "user_id")
@@ -129,14 +122,18 @@ class PaymentService:
                     .first()
                 )
                 if existing_booking:
-                    logger.info(
-                        "Duplicate booking request detected | idempotency_key=%s booking_id=%s",
-                        idempotency_key,
-                        existing_booking.booking_id,
-                    )
                     return existing_booking, existing_booking.payment, "duplicate"
 
-            with acquire_lock(lock_key, timeout=15):
+            hold = HoldService.validate_hold(
+                hold_token=hold_token,
+                user_id=str(user_uuid),
+                event_id=str(event_uuid),
+                seat_id=str(seat_uuid),
+            )
+            if not hold:
+                raise HTTPException(status_code=409, detail="Seat hold is missing or expired")
+
+            with acquire_lock(lock_key, timeout=10):
                 seat = (
                     db.query(Seat)
                     .filter(and_(Seat.seat_id == seat_uuid, Seat.event_id == event_uuid))
@@ -148,28 +145,10 @@ class PaymentService:
                     raise HTTPException(status_code=404, detail="Seat not found")
 
                 seat_status_value = PaymentService._normalize_status(seat.status)
-
-                logger.info(
-                    "Seat status check | seat_id=%s event_id=%s raw_status=%r normalized=%s booked_by=%s booked_at=%s",
-                    seat_uuid,
-                    event_uuid,
-                    seat.status,
-                    seat_status_value,
-                    seat.booked_by,
-                    seat.booked_at,
-                )
-
                 if seat_status_value == "booked":
                     raise HTTPException(status_code=409, detail="Seat is already booked")
-
-                if seat_status_value == "locked":
-                    raise HTTPException(status_code=409, detail="Seat is currently locked")
-
                 if seat_status_value != "available":
-                    raise HTTPException(
-                        status_code=409,
-                        detail=f"Seat is not available: {seat_status_value}",
-                    )
+                    raise HTTPException(status_code=409, detail=f"Seat is not available: {seat_status_value}")
 
                 event = db.query(Event).filter(Event.event_id == event_uuid).first()
                 if not event:
@@ -211,12 +190,48 @@ class PaymentService:
                 payment.status = PaymentStatus("processing")
                 db.flush()
 
-                success, gateway_response = MockPaymentGateway.process_payment(
-                    amount=PaymentService._to_float(seat.price),
-                    currency="USD",
-                    payment_method=payment_method_value,
-                    payment_details=payment_details,
+            PaymentService._schedule_broadcast(
+                event_id=str(event_uuid),
+                message={
+                    "type": "seat_update",
+                    "action": "payment_processing",
+                    "event_id": str(event_uuid),
+                    "seat_id": str(seat_uuid),
+                    "seat_number": seat.seat_number,
+                    "status": "held",
+                    "held_by": str(user_uuid),
+                    "timestamp": datetime.utcnow().isoformat(),
+                },
+            )
+
+            success, gateway_response = MockPaymentGateway.process_payment(
+                amount=PaymentService._to_float(seat.price),
+                currency="USD",
+                payment_method=payment_method_value,
+                payment_details=payment_details,
+            )
+
+            with acquire_lock(lock_key, timeout=10):
+                hold = HoldService.validate_hold(
+                    hold_token=hold_token,
+                    user_id=str(user_uuid),
+                    event_id=str(event_uuid),
+                    seat_id=str(seat_uuid),
                 )
+                if not hold:
+                    raise HTTPException(status_code=409, detail="Seat hold expired during payment")
+
+                seat = (
+                    db.query(Seat)
+                    .filter(and_(Seat.seat_id == seat_uuid, Seat.event_id == event_uuid))
+                    .with_for_update()
+                    .first()
+                )
+                payment = db.query(Payment).filter(Payment.payment_id == payment.payment_id).first()
+                booking = db.query(Booking).filter(Booking.booking_id == booking.booking_id).first()
+
+                if not seat or not payment or not booking:
+                    raise HTTPException(status_code=500, detail="Booking state could not be finalized")
 
                 if success:
                     payment.status = PaymentStatus("completed")
@@ -246,6 +261,7 @@ class PaymentService:
                     db.commit()
                     db.refresh(booking)
                     db.refresh(payment)
+                    HoldService.release_hold(hold_token)
 
                     PaymentService._schedule_broadcast(
                         event_id=str(event_uuid),
@@ -283,6 +299,20 @@ class PaymentService:
                 db.commit()
                 db.refresh(booking)
                 db.refresh(payment)
+                HoldService.release_hold(hold_token)
+
+                PaymentService._schedule_broadcast(
+                    event_id=str(event_uuid),
+                    message={
+                        "type": "seat_update",
+                        "action": "released",
+                        "event_id": str(event_uuid),
+                        "seat_id": str(seat_uuid),
+                        "seat_number": seat.seat_number,
+                        "status": "available",
+                        "timestamp": datetime.utcnow().isoformat(),
+                    },
+                )
 
                 raise HTTPException(
                     status_code=402,
@@ -300,15 +330,8 @@ class PaymentService:
             raise
         except Exception as exc:
             db.rollback()
-            logger.exception(
-                "Booking transaction failed | type=%s repr=%r",
-                type(exc).__name__,
-                exc,
-            )
-            raise HTTPException(
-                status_code=500,
-                detail=f"Booking failed: {type(exc).__name__}: {str(exc)}",
-            )
+            logger.exception("Booking transaction failed | type=%s repr=%r", type(exc).__name__, exc)
+            raise HTTPException(status_code=500, detail=f"Booking failed: {type(exc).__name__}: {str(exc)}")
 
     @staticmethod
     async def process_refund(db: Session, booking_id: Any, user_id: Any, reason: str):
@@ -325,10 +348,7 @@ class PaymentService:
 
             booking_status_value = PaymentService._normalize_status(booking.status)
             if booking_status_value != "confirmed":
-                raise HTTPException(
-                    status_code=400,
-                    detail=f"Cannot refund booking in {booking_status_value} status",
-                )
+                raise HTTPException(status_code=400, detail=f"Cannot refund booking in {booking_status_value} status")
 
             payment = booking.payment
             if not payment:
@@ -353,9 +373,7 @@ class PaymentService:
             payment.status = PaymentStatus("refunded")
             payment.gateway_response = json.dumps(
                 {
-                    "payment": json.loads(payment.gateway_response)
-                    if payment.gateway_response
-                    else None,
+                    "payment": json.loads(payment.gateway_response) if payment.gateway_response else None,
                     "refund": refund_response,
                 }
             )
@@ -385,22 +403,19 @@ class PaymentService:
             db.refresh(booking)
             db.refresh(payment)
 
-            try:
-                await manager.broadcast_to_event(
-                    event_id=str(booking.event_id),
-                    message={
-                        "type": "seat_update",
-                        "action": "released",
-                        "event_id": str(booking.event_id),
-                        "seat_id": str(booking.seat_id),
-                        "seat_number": seat_number,
-                        "status": "available",
-                        "refund_id": refund_response.get("refund_id"),
-                        "timestamp": datetime.utcnow().isoformat(),
-                    },
-                )
-            except Exception as exc:
-                logger.warning("WebSocket refund broadcast failed: %s", exc)
+            await manager.broadcast_to_event(
+                event_id=str(booking.event_id),
+                message={
+                    "type": "seat_update",
+                    "action": "refunded",
+                    "event_id": str(booking.event_id),
+                    "seat_id": str(booking.seat_id),
+                    "seat_number": seat_number,
+                    "status": "available",
+                    "refund_id": refund_response.get("refund_id"),
+                    "timestamp": datetime.utcnow().isoformat(),
+                },
+            )
 
             return {
                 "booking_id": str(booking.booking_id),
@@ -417,12 +432,5 @@ class PaymentService:
             raise
         except Exception as exc:
             db.rollback()
-            logger.exception(
-                "Refund transaction failed | type=%s repr=%r",
-                type(exc).__name__,
-                exc,
-            )
-            raise HTTPException(
-                status_code=500,
-                detail=f"Refund failed: {type(exc).__name__}: {str(exc)}",
-            )
+            logger.exception("Refund transaction failed | type=%s repr=%r", type(exc).__name__, exc)
+            raise HTTPException(status_code=500, detail=f"Refund failed: {type(exc).__name__}: {str(exc)}")
