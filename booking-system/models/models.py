@@ -5,11 +5,15 @@ from datetime import datetime
 import enum
 import uuid
 
-from sqlalchemy import Column, DateTime, Enum, ForeignKey, Integer, Numeric, String, Text
+from sqlalchemy import Column, DateTime, Enum as SAEnum, ForeignKey, Integer, Numeric, String, Text
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 
 from app.database import Base
+
+
+def enum_values(enum_cls):
+    return [item.value for item in enum_cls]
 
 
 class Event(Base):
@@ -29,26 +33,6 @@ class Event(Base):
 class SeatStatus(str, enum.Enum):
     AVAILABLE = "available"
     BOOKED = "booked"
-
-
-class Seat(Base):
-    __tablename__ = "seats"
-
-    seat_id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    event_id = Column(
-        UUID(as_uuid=True),
-        ForeignKey("events.event_id", ondelete="CASCADE"),
-        nullable=False,
-    )
-    seat_number = Column(String(50), nullable=False)
-    price = Column(Numeric(10, 2), nullable=False)
-    status = Column(Enum(SeatStatus), default=SeatStatus.AVAILABLE, nullable=False)
-    version = Column(Integer, default=0, nullable=False)
-    booked_by = Column(UUID(as_uuid=True), nullable=True)
-    booked_at = Column(DateTime, nullable=True)
-    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
-
-    event = relationship("Event", back_populates="seats")
 
 
 class BookingStatus(str, enum.Enum):
@@ -76,6 +60,35 @@ class PaymentMethod(str, enum.Enum):
     WALLET = "wallet"
 
 
+class Seat(Base):
+    __tablename__ = "seats"
+
+    seat_id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    event_id = Column(
+        UUID(as_uuid=True),
+        ForeignKey("events.event_id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    seat_number = Column(String(50), nullable=False)
+    price = Column(Numeric(10, 2), nullable=False)
+    status = Column(
+        SAEnum(
+            SeatStatus,
+            name="seatstatus",
+            values_callable=enum_values,
+            validate_strings=True,
+        ),
+        default=SeatStatus.AVAILABLE,
+        nullable=False,
+    )
+    version = Column(Integer, default=0, nullable=False)
+    booked_by = Column(UUID(as_uuid=True), nullable=True)
+    booked_at = Column(DateTime, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+
+    event = relationship("Event", back_populates="seats")
+
+
 class Booking(Base):
     __tablename__ = "bookings"
 
@@ -84,7 +97,12 @@ class Booking(Base):
     event_id = Column(UUID(as_uuid=True), ForeignKey("events.event_id"), nullable=False)
     seat_id = Column(UUID(as_uuid=True), ForeignKey("seats.seat_id"), nullable=False)
     status = Column(
-        Enum(BookingStatus),
+        SAEnum(
+            BookingStatus,
+            name="bookingstatus",
+            values_callable=enum_values,
+            validate_strings=True,
+        ),
         default=BookingStatus.PENDING_PAYMENT,
         nullable=False,
     )
@@ -109,8 +127,25 @@ class Payment(Base):
     user_id = Column(UUID(as_uuid=True), nullable=False)
     amount = Column(Numeric(10, 2), nullable=False)
     currency = Column(String(3), default="USD", nullable=False)
-    payment_method = Column(Enum(PaymentMethod), nullable=False)
-    status = Column(Enum(PaymentStatus), default=PaymentStatus.PENDING, nullable=False)
+    payment_method = Column(
+        SAEnum(
+            PaymentMethod,
+            name="paymentmethod",
+            values_callable=enum_values,
+            validate_strings=True,
+        ),
+        nullable=False,
+    )
+    status = Column(
+        SAEnum(
+            PaymentStatus,
+            name="paymentstatus",
+            values_callable=enum_values,
+            validate_strings=True,
+        ),
+        default=PaymentStatus.PENDING,
+        nullable=False,
+    )
 
     gateway_transaction_id = Column(
         String(255),

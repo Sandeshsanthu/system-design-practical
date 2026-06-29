@@ -4,7 +4,10 @@
 import asyncio
 import json
 import logging
+import uuid
 from datetime import datetime
+from decimal import Decimal
+from typing import Any, Optional, Tuple
 
 from fastapi import HTTPException
 from sqlalchemy import and_
@@ -29,48 +32,94 @@ logger = logging.getLogger(__name__)
 
 
 class PaymentService:
-    """Service to handle payment processing with transaction safety"""
+    """Service to handle booking, payment, and refund flows safely."""
 
     @staticmethod
-    def _normalize_payment_method(payment_method) -> str:
+    def _normalize_payment_method(payment_method: Any) -> str:
         if hasattr(payment_method, "value"):
             return str(payment_method.value).strip().lower()
         return str(payment_method).strip().lower()
 
     @staticmethod
-    def _normalize_seat_status(seat_status) -> str:
-        if hasattr(seat_status, "value"):
-            return str(seat_status.value).strip().lower()
+    def _normalize_status(value: Any) -> str:
+        if hasattr(value, "value"):
+            return str(value.value).strip().lower()
 
-        normalized = str(seat_status).strip().lower()
+        normalized = str(value).strip().lower()
         if "." in normalized:
             normalized = normalized.split(".")[-1]
         return normalized
 
     @staticmethod
+    def _to_uuid(value: Any, field_name: str) -> uuid.UUID:
+        if isinstance(value, uuid.UUID):
+            return value
+        try:
+            return uuid.UUID(str(value))
+        except Exception as exc:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Invalid {field_name}: {value}",
+            ) from exc
+
+    @staticmethod
+    def _to_float(value: Any) -> float:
+        if isinstance(value, Decimal):
+            return float(value)
+        return float(value)
+
+    @staticmethod
     def _schedule_broadcast(event_id: str, message: dict) -> None:
         try:
             loop = asyncio.get_running_loop()
-            loop.create_task(
-                manager.broadcast_to_event(event_id=event_id, message=message)
-            )
+            loop.create_task(manager.broadcast_to_event(event_id=event_id, message=message))
         except RuntimeError:
             logger.warning("No running event loop for WebSocket broadcast")
         except Exception as exc:
             logger.warning("WebSocket broadcast scheduling failed: %s", exc)
 
     @staticmethod
+    def _get_payment_method_enum(payment_method: str) -> PaymentMethod:
+        try:
+            return PaymentMethod(payment_method)
+        except ValueError as exc:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Invalid payment method: {payment_method}",
+            ) from exc
+
+    @staticmethod
+    def _create_audit_log(
+        payment_id: uuid.UUID,
+        event_type: str,
+        old_status: Optional[str],
+        new_status: str,
+        details: str,
+    ) -> PaymentAuditLog:
+        return PaymentAuditLog(
+            payment_id=payment_id,
+            event_type=event_type,
+            old_status=old_status,
+            new_status=new_status,
+            details=details,
+        )
+
+    @staticmethod
     def create_booking_with_payment(
         db: Session,
-        user_id: str,
-        event_id: str,
-        seat_id: str,
+        user_id: Any,
+        event_id: Any,
+        seat_id: Any,
         payment_method: str,
         payment_details: dict,
         idempotency_key: str = None,
-    ):
-        lock_key = f"booking:{event_id}:{seat_id}"
+    ) -> Tuple[Booking, Optional[Payment], str]:
+        user_uuid = PaymentService._to_uuid(user_id, "user_id")
+        event_uuid = PaymentService._to_uuid(event_id, "event_id")
+        seat_uuid = PaymentService._to_uuid(seat_id, "seat_id")
         payment_method_value = PaymentService._normalize_payment_method(payment_method)
+        payment_method_enum = PaymentService._get_payment_method_enum(payment_method_value)
+        lock_key = f"booking:{event_uuid}:{seat_uuid}"
 
         try:
             if idempotency_key:
@@ -80,20 +129,17 @@ class PaymentService:
                     .first()
                 )
                 if existing_booking:
+                    logger.info(
+                        "Duplicate booking request detected | idempotency_key=%s booking_id=%s",
+                        idempotency_key,
+                        existing_booking.booking_id,
+                    )
                     return existing_booking, existing_booking.payment, "duplicate"
-
-            try:
-                payment_method_enum = PaymentMethod(payment_method_value)
-            except ValueError:
-                raise HTTPException(
-                    status_code=400,
-                    detail=f"Invalid payment method: {payment_method_value}",
-                )
 
             with acquire_lock(lock_key, timeout=15):
                 seat = (
                     db.query(Seat)
-                    .filter(and_(Seat.seat_id == seat_id, Seat.event_id == event_id))
+                    .filter(and_(Seat.seat_id == seat_uuid, Seat.event_id == event_uuid))
                     .with_for_update()
                     .first()
                 )
@@ -101,34 +147,40 @@ class PaymentService:
                 if not seat:
                     raise HTTPException(status_code=404, detail="Seat not found")
 
-                seat_status_value = PaymentService._normalize_seat_status(seat.status)
+                seat_status_value = PaymentService._normalize_status(seat.status)
 
-                logger.warning(
-                    "Seat status check | seat_id=%s event_id=%s raw_status=%r raw_type=%s normalized=%s booked_by=%s booked_at=%s",
-                    seat_id,
-                    event_id,
+                logger.info(
+                    "Seat status check | seat_id=%s event_id=%s raw_status=%r normalized=%s booked_by=%s booked_at=%s",
+                    seat_uuid,
+                    event_uuid,
                     seat.status,
-                    type(seat.status).__name__,
                     seat_status_value,
                     seat.booked_by,
                     seat.booked_at,
                 )
 
-                if seat_status_value == SeatStatus.BOOKED.value:
+                if seat_status_value == "booked":
+                    raise HTTPException(status_code=409, detail="Seat is already booked")
+
+                if seat_status_value == "locked":
+                    raise HTTPException(status_code=409, detail="Seat is currently locked")
+
+                if seat_status_value != "available":
                     raise HTTPException(
-                        status_code=409, detail="Seat is already booked"
+                        status_code=409,
+                        detail=f"Seat is not available: {seat_status_value}",
                     )
 
-                event = db.query(Event).filter(Event.event_id == event_id).first()
+                event = db.query(Event).filter(Event.event_id == event_uuid).first()
                 if not event:
                     raise HTTPException(status_code=404, detail="Event not found")
 
                 booking = Booking(
-                    user_id=user_id,
-                    event_id=event_id,
-                    seat_id=seat_id,
+                    user_id=user_uuid,
+                    event_id=event_uuid,
+                    seat_id=seat_uuid,
                     total_amount=seat.price,
-                    status=BookingStatus.PENDING_PAYMENT,
+                    status=BookingStatus("pending_payment"),
                     idempotency_key=idempotency_key,
                 )
                 db.add(booking)
@@ -136,17 +188,17 @@ class PaymentService:
 
                 payment = Payment(
                     booking_id=booking.booking_id,
-                    user_id=user_id,
+                    user_id=user_uuid,
                     amount=seat.price,
                     currency="USD",
                     payment_method=payment_method_enum,
-                    status=PaymentStatus.PENDING,
+                    status=PaymentStatus("pending"),
                 )
                 db.add(payment)
                 db.flush()
 
                 db.add(
-                    PaymentAuditLog(
+                    PaymentService._create_audit_log(
                         payment_id=payment.payment_id,
                         event_type="initiated",
                         old_status=None,
@@ -155,22 +207,20 @@ class PaymentService:
                     )
                 )
 
-                booking.status = BookingStatus.PAYMENT_PROCESSING
-                payment.status = PaymentStatus.PROCESSING
+                booking.status = BookingStatus("payment_processing")
+                payment.status = PaymentStatus("processing")
                 db.flush()
 
                 success, gateway_response = MockPaymentGateway.process_payment(
-                    amount=float(seat.price),
+                    amount=PaymentService._to_float(seat.price),
                     currency="USD",
                     payment_method=payment_method_value,
                     payment_details=payment_details,
                 )
 
                 if success:
-                    payment.status = PaymentStatus.COMPLETED
-                    payment.gateway_transaction_id = gateway_response.get(
-                        "transaction_id"
-                    )
+                    payment.status = PaymentStatus("completed")
+                    payment.gateway_transaction_id = gateway_response.get("transaction_id")
                     payment.gateway_response = json.dumps(gateway_response)
                     payment.completed_at = datetime.utcnow()
 
@@ -178,13 +228,13 @@ class PaymentService:
                         payment.card_last4 = gateway_response.get("card_last4")
                         payment.card_brand = gateway_response.get("card_brand")
 
-                    booking.status = BookingStatus.CONFIRMED
-                    seat.status = SeatStatus.BOOKED
-                    seat.booked_by = user_id
+                    booking.status = BookingStatus("confirmed")
+                    seat.status = SeatStatus("booked")
+                    seat.booked_by = user_uuid
                     seat.booked_at = datetime.utcnow()
 
                     db.add(
-                        PaymentAuditLog(
+                        PaymentService._create_audit_log(
                             payment_id=payment.payment_id,
                             event_type="completed",
                             old_status="processing",
@@ -198,15 +248,15 @@ class PaymentService:
                     db.refresh(payment)
 
                     PaymentService._schedule_broadcast(
-                        event_id=event_id,
+                        event_id=str(event_uuid),
                         message={
                             "type": "seat_update",
                             "action": "booked",
-                            "event_id": event_id,
-                            "seat_id": seat_id,
+                            "event_id": str(event_uuid),
+                            "seat_id": str(seat_uuid),
                             "seat_number": seat.seat_number,
                             "status": "booked",
-                            "booked_by": user_id,
+                            "booked_by": str(user_uuid),
                             "booking_id": str(booking.booking_id),
                             "timestamp": datetime.utcnow().isoformat(),
                         },
@@ -214,14 +264,14 @@ class PaymentService:
 
                     return booking, payment, "success"
 
-                payment.status = PaymentStatus.FAILED
+                payment.status = PaymentStatus("failed")
                 payment.gateway_response = json.dumps(gateway_response)
                 payment.failed_at = datetime.utcnow()
                 payment.failure_reason = gateway_response.get("error", "Payment failed")
-                booking.status = BookingStatus.FAILED
+                booking.status = BookingStatus("failed")
 
                 db.add(
-                    PaymentAuditLog(
+                    PaymentService._create_audit_log(
                         payment_id=payment.payment_id,
                         event_type="failed",
                         old_status="processing",
@@ -250,32 +300,47 @@ class PaymentService:
             raise
         except Exception as exc:
             db.rollback()
-            logger.exception("Booking transaction failed")
-            raise HTTPException(status_code=500, detail=f"Booking failed: {str(exc)}")
+            logger.exception(
+                "Booking transaction failed | type=%s repr=%r",
+                type(exc).__name__,
+                exc,
+            )
+            raise HTTPException(
+                status_code=500,
+                detail=f"Booking failed: {type(exc).__name__}: {str(exc)}",
+            )
 
     @staticmethod
-    async def process_refund(db: Session, booking_id: str, user_id: str, reason: str):
+    async def process_refund(db: Session, booking_id: Any, user_id: Any, reason: str):
+        booking_uuid = PaymentService._to_uuid(booking_id, "booking_id")
+        user_uuid = PaymentService._to_uuid(user_id, "user_id")
+
         try:
-            booking = db.query(Booking).filter(Booking.booking_id == booking_id).first()
+            booking = db.query(Booking).filter(Booking.booking_id == booking_uuid).first()
             if not booking:
                 raise HTTPException(status_code=404, detail="Booking not found")
 
-            if str(booking.user_id) != user_id:
+            if booking.user_id != user_uuid:
                 raise HTTPException(status_code=403, detail="Not your booking")
 
-            if booking.status != BookingStatus.CONFIRMED:
+            booking_status_value = PaymentService._normalize_status(booking.status)
+            if booking_status_value != "confirmed":
                 raise HTTPException(
                     status_code=400,
-                    detail=f"Cannot refund booking in {booking.status.value} status",
+                    detail=f"Cannot refund booking in {booking_status_value} status",
                 )
 
             payment = booking.payment
-            if not payment or payment.status != PaymentStatus.COMPLETED:
+            if not payment:
+                raise HTTPException(status_code=400, detail="No payment found")
+
+            payment_status_value = PaymentService._normalize_status(payment.status)
+            if payment_status_value != "completed":
                 raise HTTPException(status_code=400, detail="No completed payment found")
 
             success, refund_response = MockPaymentGateway.process_refund(
                 transaction_id=payment.gateway_transaction_id,
-                amount=float(payment.amount),
+                amount=PaymentService._to_float(payment.amount),
                 reason=reason,
             )
 
@@ -285,24 +350,29 @@ class PaymentService:
                     detail=f"Refund processing failed: {refund_response.get('error')}",
                 )
 
-            payment.status = PaymentStatus.REFUNDED
-            payment.refunded_at = datetime.utcnow()
-            payment.refund_reason = reason
-            payment.refund_transaction_id = refund_response.get("refund_id")
+            payment.status = PaymentStatus("refunded")
+            payment.gateway_response = json.dumps(
+                {
+                    "payment": json.loads(payment.gateway_response)
+                    if payment.gateway_response
+                    else None,
+                    "refund": refund_response,
+                }
+            )
 
-            booking.status = BookingStatus.REFUNDED
+            booking.status = BookingStatus("refunded")
             booking.updated_at = datetime.utcnow()
 
             seat = db.query(Seat).filter(Seat.seat_id == booking.seat_id).first()
             seat_number = None
             if seat:
                 seat_number = seat.seat_number
-                seat.status = SeatStatus.AVAILABLE
+                seat.status = SeatStatus("available")
                 seat.booked_by = None
                 seat.booked_at = None
 
             db.add(
-                PaymentAuditLog(
+                PaymentService._create_audit_log(
                     payment_id=payment.payment_id,
                     event_type="refunded",
                     old_status="completed",
@@ -325,7 +395,7 @@ class PaymentService:
                         "seat_id": str(booking.seat_id),
                         "seat_number": seat_number,
                         "status": "available",
-                        "refund_id": payment.refund_transaction_id,
+                        "refund_id": refund_response.get("refund_id"),
                         "timestamp": datetime.utcnow().isoformat(),
                     },
                 )
@@ -333,11 +403,11 @@ class PaymentService:
                 logger.warning("WebSocket refund broadcast failed: %s", exc)
 
             return {
-                "booking_id": str(booking_id),
+                "booking_id": str(booking.booking_id),
                 "payment_id": str(payment.payment_id),
-                "refund_amount": float(payment.amount),
+                "refund_amount": PaymentService._to_float(payment.amount),
                 "status": "refunded",
-                "refund_transaction_id": payment.refund_transaction_id,
+                "refund_transaction_id": refund_response.get("refund_id"),
                 "seat_released": True,
                 "message": "Refund processed successfully and seat has been released",
             }
@@ -347,5 +417,12 @@ class PaymentService:
             raise
         except Exception as exc:
             db.rollback()
-            logger.exception("Refund transaction failed")
-            raise HTTPException(status_code=500, detail=f"Refund failed: {str(exc)}")
+            logger.exception(
+                "Refund transaction failed | type=%s repr=%r",
+                type(exc).__name__,
+                exc,
+            )
+            raise HTTPException(
+                status_code=500,
+                detail=f"Refund failed: {type(exc).__name__}: {str(exc)}",
+            )
