@@ -46,57 +46,205 @@ REALTIME_HTML = """
     <meta charset="UTF-8" />
     <title>Realtime Seat Booking</title>
     <style>
-        body { font-family: Arial, sans-serif; margin: 24px; }
-        .row { margin-bottom: 16px; }
+        body { font-family: Arial, sans-serif; margin: 24px; background: #f7f7f7; color: #222; }
+        h2, h3 { margin-bottom: 12px; }
+        .row { margin-bottom: 14px; }
+        .panel {
+            background: #fff; border: 1px solid #ddd; border-radius: 10px;
+            padding: 16px; margin-bottom: 18px;
+        }
         .seats { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 16px; }
         .seat {
-            width: 100px; height: 68px; border: 1px solid #ccc; border-radius: 8px;
+            width: 120px; min-height: 96px; border: 1px solid #ccc; border-radius: 10px;
             display: flex; flex-direction: column; align-items: center; justify-content: center;
-            font-size: 12px; font-weight: 600;
+            font-size: 12px; font-weight: 600; padding: 8px; cursor: pointer;
+            transition: transform 0.12s ease, box-shadow 0.12s ease;
         }
+        .seat:hover { transform: translateY(-2px); box-shadow: 0 2px 10px rgba(0,0,0,0.08); }
         .available { background: #d4f7d4; }
         .held { background: #ffe9a8; }
-        .booked { background: #ffc7c7; }
+        .booked { background: #ffc7c7; cursor: not-allowed; }
+        .selected { outline: 3px solid #007bff; }
+        .actions { display: flex; gap: 10px; flex-wrap: wrap; }
+        .actions button, .row button {
+            padding: 10px 14px; border: 0; border-radius: 8px; cursor: pointer;
+            background: #007bff; color: white; font-weight: 600;
+        }
+        .actions button.secondary { background: #6c757d; }
+        .actions button.danger { background: #dc3545; }
+        .actions button:disabled { background: #aaa; cursor: not-allowed; }
+        input, select {
+            padding: 10px; border: 1px solid #ccc; border-radius: 8px;
+            width: 100%; box-sizing: border-box;
+        }
+        .grid-2 {
+            display: grid; grid-template-columns: 1fr 1fr; gap: 12px;
+        }
+        .grid-3 {
+            display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px;
+        }
+        .muted { color: #666; font-size: 13px; }
+        .status-line { margin-bottom: 8px; }
         .log {
             margin-top: 20px; border: 1px solid #ddd; padding: 12px; height: 240px; overflow-y: auto;
-            background: #fafafa; font-size: 13px;
+            background: #fafafa; font-size: 13px; border-radius: 8px;
         }
-        input, button { padding: 8px 10px; }
-        .muted { color: #666; font-size: 13px; }
+        .pill {
+            display: inline-block; padding: 4px 8px; border-radius: 999px;
+            background: #eef2f7; font-size: 12px; margin-left: 8px;
+        }
+        .seat button {
+            margin-top: 8px; padding: 5px 8px; font-size: 11px;
+            border: 0; border-radius: 6px; cursor: pointer;
+            background: #1f1f1f; color: white;
+        }
+        .tiny { font-size: 12px; word-break: break-all; }
     </style>
 </head>
 <body>
-    <h2>Realtime Seat Updates</h2>
+    <h2>Realtime Seat Booking</h2>
 
-    <div class="row">
-        <input id="eventIdInput" placeholder="Enter event_id" style="width: 360px;" />
-        <button onclick="startRealtime()">Connect</button>
+    <div class="panel">
+        <div class="row">
+            <label><strong>Event ID</strong></label>
+            <div style="display:flex; gap:10px;">
+                <input id="eventIdInput" placeholder="Enter event_id" />
+                <button onclick="startRealtime()" style="width: 160px;">Connect</button>
+            </div>
+        </div>
+
+        <div class="row">
+            <label><strong>User ID</strong></label>
+            <input id="userIdInput" readonly />
+            <div class="muted">Auto-generated per browser viewer and saved locally.</div>
+        </div>
+
+        <div class="muted">
+            Open with: <b>/realtime?event_id=YOUR_EVENT_ID</b>
+        </div>
     </div>
 
-    <div class="muted">
-        Open with: <b>/realtime?event_id=YOUR_EVENT_ID</b>
+    <div class="panel">
+        <div class="status-line"><strong>Connection:</strong> <span id="connectionStatus">Not connected</span></div>
+        <div class="status-line"><strong>Watching event:</strong> <span id="activeEvent">-</span></div>
+        <div class="status-line"><strong>Selected seat:</strong> <span id="selectedSeatLabel">-</span></div>
+        <div class="status-line"><strong>Hold token:</strong> <span id="holdTokenLabel" class="tiny">-</span></div>
+        <div class="status-line"><strong>Booking ID:</strong> <span id="bookingIdLabel" class="tiny">-</span></div>
     </div>
 
-    <div class="row">
-        <strong>Connection:</strong> <span id="connectionStatus">Not connected</span>
+    <div class="panel">
+        <h3>Payment Details</h3>
+        <div class="row">
+            <label><strong>Payment Method</strong></label>
+            <select id="paymentMethod">
+                <option value="credit_card">credit_card</option>
+            </select>
+        </div>
+        <div class="grid-2 row">
+            <div>
+                <label><strong>Card Number</strong></label>
+                <input id="cardNumber" value="4242424242424242" />
+            </div>
+            <div>
+                <label><strong>Card Holder</strong></label>
+                <input id="cardHolder" value="John Doe" />
+            </div>
+        </div>
+        <div class="grid-3 row">
+            <div>
+                <label><strong>Expiry Month</strong></label>
+                <input id="expiryMonth" value="12" />
+            </div>
+            <div>
+                <label><strong>Expiry Year</strong></label>
+                <input id="expiryYear" value="2026" />
+            </div>
+            <div>
+                <label><strong>CVV</strong></label>
+                <input id="cvv" value="123" />
+            </div>
+        </div>
+        <div class="actions">
+            <button onclick="holdSelectedSeat()">Hold Seat</button>
+            <button onclick="bookSelectedSeat()">Book Seat</button>
+            <button class="secondary" onclick="refreshSeats()">Refresh Seats</button>
+            <button class="danger" onclick="releaseCurrentHold()">Release Hold</button>
+        </div>
     </div>
 
-    <div class="row">
-        <strong>Watching event:</strong> <span id="activeEvent">-</span>
+    <div class="panel">
+        <h3>Seats</h3>
+        <div id="seats" class="seats"></div>
     </div>
 
-    <div id="seats" class="seats"></div>
-    <div id="log" class="log"></div>
+    <div class="panel">
+        <h3>Activity Log</h3>
+        <div id="log" class="log"></div>
+    </div>
 
     <script>
         let socket = null;
         let seats = [];
+        let selectedSeat = null;
+        let currentHoldToken = null;
 
         function log(message) {
             const box = document.getElementById("log");
             const line = document.createElement("div");
             line.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
             box.prepend(line);
+        }
+
+        function ensureViewerUserId() {
+            let userId = localStorage.getItem("booking_demo_user_id");
+            if (!userId) {
+                userId = crypto.randomUUID();
+                localStorage.setItem("booking_demo_user_id", userId);
+            }
+            document.getElementById("userIdInput").value = userId;
+            return userId;
+        }
+
+        function getUserId() {
+            return document.getElementById("userIdInput").value.trim();
+        }
+
+        function getEventId() {
+            return document.getElementById("eventIdInput").value.trim();
+        }
+
+        function setConnectionStatus(status) {
+            document.getElementById("connectionStatus").textContent = status;
+        }
+
+        function setSelectedSeat(seat) {
+            selectedSeat = seat;
+            document.getElementById("selectedSeatLabel").textContent = seat
+                ? `${seat.seat_number} | ${seat.seat_id} | ${seat.status}`
+                : "-";
+            renderSeats();
+        }
+
+        function setHoldToken(token) {
+            currentHoldToken = token;
+            document.getElementById("holdTokenLabel").textContent = token || "-";
+        }
+
+        function setBookingId(bookingId) {
+            document.getElementById("bookingIdLabel").textContent = bookingId || "-";
+        }
+
+        function updateSeatStatus(seatId, status) {
+            const index = seats.findIndex((seat) => String(seat.seat_id) === String(seatId));
+            if (index >= 0) {
+                seats[index].status = status;
+            }
+            if (selectedSeat && String(selectedSeat.seat_id) === String(seatId)) {
+                selectedSeat.status = status;
+                document.getElementById("selectedSeatLabel").textContent =
+                    `${selectedSeat.seat_number} | ${selectedSeat.seat_id} | ${selectedSeat.status}`;
+            }
+            renderSeats();
         }
 
         function renderSeats() {
@@ -106,31 +254,41 @@ REALTIME_HTML = """
             seats.forEach((seat) => {
                 const card = document.createElement("div");
                 const status = String(seat.status).toLowerCase();
-                card.className = `seat ${status}`;
+                const isSelected = selectedSeat && String(selectedSeat.seat_id) === String(seat.seat_id);
+
+                card.className = `seat ${status}${isSelected ? " selected" : ""}`;
                 card.innerHTML = `
-                    <div>${seat.seat_number}</div>
+                    <div><strong>${seat.seat_number}</strong></div>
                     <div>${status}</div>
-                    <div>$${seat.price}</div>
+                    <div>$${Number(seat.price).toFixed(2)}</div>
+                    ${status !== "booked" ? "<button type=\\"button\\">Select</button>" : ""}
                 `;
+
+                if (status !== "booked") {
+                    card.addEventListener("click", () => setSelectedSeat(seat));
+                }
+
                 container.appendChild(card);
             });
         }
 
         async function loadSeats(eventId) {
-            const res = await fetch(`/events/${eventId}/seats`);
-            if (!res.ok) {
-                throw new Error(`Seat fetch failed: ${res.status}`);
+            const response = await fetch(`/events/${eventId}/seats`);
+            if (!response.ok) {
+                throw new Error(`Seat fetch failed: ${response.status}`);
             }
-            seats = await res.json();
+            seats = await response.json();
             renderSeats();
         }
 
-        function updateSeatStatus(seatId, status) {
-            const index = seats.findIndex((seat) => String(seat.seat_id) === String(seatId));
-            if (index >= 0) {
-                seats[index].status = status;
-                renderSeats();
+        async function refreshSeats() {
+            const eventId = getEventId();
+            if (!eventId) {
+                alert("Enter event_id first");
+                return;
             }
+            await loadSeats(eventId);
+            log("Seat list refreshed");
         }
 
         function closeSocket() {
@@ -141,23 +299,31 @@ REALTIME_HTML = """
         }
 
         async function startRealtime() {
-            const eventId = document.getElementById("eventIdInput").value.trim();
+            const eventId = getEventId();
             if (!eventId) {
                 alert("Enter event_id");
                 return;
             }
 
+            ensureViewerUserId();
             document.getElementById("activeEvent").textContent = eventId;
-            document.getElementById("connectionStatus").textContent = "Connecting...";
-
+            setConnectionStatus("Connecting...");
             closeSocket();
-            await loadSeats(eventId);
+
+            try {
+                await loadSeats(eventId);
+            } catch (error) {
+                setConnectionStatus("Error");
+                log(`Failed to load seats: ${error.message}`);
+                alert(error.message);
+                return;
+            }
 
             const protocol = window.location.protocol === "https:" ? "wss" : "ws";
             socket = new WebSocket(`${protocol}://${window.location.host}/ws/events/${eventId}`);
 
             socket.onopen = () => {
-                document.getElementById("connectionStatus").textContent = "Connected";
+                setConnectionStatus("Connected");
                 log(`Connected to event ${eventId}`);
             };
 
@@ -177,17 +343,147 @@ REALTIME_HTML = """
             };
 
             socket.onclose = () => {
-                document.getElementById("connectionStatus").textContent = "Disconnected";
+                setConnectionStatus("Disconnected");
                 log("Socket disconnected");
             };
 
             socket.onerror = () => {
-                document.getElementById("connectionStatus").textContent = "Error";
+                setConnectionStatus("Error");
                 log("Socket error");
             };
         }
 
+        async function holdSelectedSeat() {
+            const eventId = getEventId();
+            const userId = getUserId();
+
+            if (!eventId) {
+                alert("Enter event_id");
+                return;
+            }
+            if (!userId) {
+                alert("Missing user_id");
+                return;
+            }
+            if (!selectedSeat) {
+                alert("Select a seat first");
+                return;
+            }
+            if (String(selectedSeat.status).toLowerCase() === "booked") {
+                alert("Seat already booked");
+                return;
+            }
+
+            const response = await fetch("/holds", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    user_id: userId,
+                    event_id: eventId,
+                    seat_id: selectedSeat.seat_id,
+                    ttl_seconds: 300
+                })
+            });
+
+            const data = await response.json();
+            if (!response.ok) {
+                log(`Hold failed: ${JSON.stringify(data)}`);
+                alert(data.detail || "Hold failed");
+                return;
+            }
+
+            setHoldToken(data.hold_token);
+            log(`Hold created for seat ${selectedSeat.seat_number}`);
+            await loadSeats(eventId);
+            updateSeatStatus(selectedSeat.seat_id, "held");
+        }
+
+        async function bookSelectedSeat() {
+            const eventId = getEventId();
+            const userId = getUserId();
+
+            if (!eventId) {
+                alert("Enter event_id");
+                return;
+            }
+            if (!userId) {
+                alert("Missing user_id");
+                return;
+            }
+            if (!selectedSeat) {
+                alert("Select a seat first");
+                return;
+            }
+            if (!currentHoldToken) {
+                alert("Create hold first");
+                return;
+            }
+
+            const payload = {
+                user_id: userId,
+                event_id: eventId,
+                seat_id: selectedSeat.seat_id,
+                hold_token: currentHoldToken,
+                payment_method: document.getElementById("paymentMethod").value,
+                card_details: {
+                    card_number: document.getElementById("cardNumber").value.trim(),
+                    card_holder_name: document.getElementById("cardHolder").value.trim(),
+                    expiry_month: document.getElementById("expiryMonth").value.trim(),
+                    expiry_year: document.getElementById("expiryYear").value.trim(),
+                    cvv: document.getElementById("cvv").value.trim()
+                }
+            };
+
+            const response = await fetch("/bookings", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(payload)
+            });
+
+            const data = await response.json();
+            if (!response.ok) {
+                log(`Booking failed: ${JSON.stringify(data)}`);
+                alert(data.detail || "Booking failed");
+                return;
+            }
+
+            setBookingId(data.booking_id);
+            log(`Booking created: ${data.booking_id}`);
+            setHoldToken(null);
+            await loadSeats(eventId);
+            updateSeatStatus(selectedSeat.seat_id, "booked");
+        }
+
+        async function releaseCurrentHold() {
+            const eventId = getEventId();
+
+            if (!currentHoldToken) {
+                alert("No active hold");
+                return;
+            }
+
+            const response = await fetch(`/holds/${currentHoldToken}`, {
+                method: "DELETE"
+            });
+
+            const data = await response.json();
+            if (!response.ok) {
+                log(`Release failed: ${JSON.stringify(data)}`);
+                alert(data.detail || "Release failed");
+                return;
+            }
+
+            log("Hold released");
+            if (selectedSeat) {
+                updateSeatStatus(selectedSeat.seat_id, "available");
+            }
+            setHoldToken(null);
+            await loadSeats(eventId);
+        }
+
         window.addEventListener("load", async () => {
+            ensureViewerUserId();
+
             const params = new URLSearchParams(window.location.search);
             const eventId = params.get("event_id");
 
