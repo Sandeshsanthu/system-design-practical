@@ -6,11 +6,12 @@ import uuid
 from datetime import datetime, timedelta
 from typing import Optional
 
+from app.config import settings
 from app.lock_service import redis_client
 
 
 class HoldService:
-    DEFAULT_TTL_SECONDS = 300
+    DEFAULT_TTL_SECONDS = settings.hold_ttl_seconds
 
     @staticmethod
     def hold_key(event_id: str, seat_id: str) -> str:
@@ -115,13 +116,17 @@ class HoldService:
         if not hold:
             return None
 
-        remaining_ttl = redis_client.ttl(HoldService.hold_key(hold["event_id"], hold["seat_id"]))
+        remaining_ttl = redis_client.ttl(
+            HoldService.hold_key(hold["event_id"], hold["seat_id"])
+        )
         if remaining_ttl is None or remaining_ttl < 0:
             remaining_ttl = 0
 
         new_ttl = remaining_ttl + extra_seconds
         hold["ttl_seconds"] = new_ttl
-        hold["expires_at"] = (datetime.utcnow() + timedelta(seconds=new_ttl)).isoformat()
+        hold["expires_at"] = (
+            datetime.utcnow() + timedelta(seconds=new_ttl)
+        ).isoformat()
 
         redis_client.set(
             HoldService.hold_key(hold["event_id"], hold["seat_id"]),
