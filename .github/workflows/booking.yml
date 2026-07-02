@@ -1,0 +1,30 @@
+name: Build and Push to Docker Hub
+
+on:
+  push:
+    branches: [ "main" ]
+    paths:
+      - 'Booking-system/**'
+
+permissions:
+  contents: write
+  packages: write
+
+jobs:
+  # JOB 1: Scan for secrets before doing anything
+  security-scan:
+    name: Secret Guardrail Scan
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: TruffleHog OSS
+        uses: trufflesecurity/trufflehog@main
+        with:
+          path: ./
+          base: ${{ github.event.before }}
+          head: ${{ github.sha }}
+          extra_args: --only-verified
