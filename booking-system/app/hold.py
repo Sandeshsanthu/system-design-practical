@@ -1,4 +1,4 @@
-#tis is hold se namesless thing to commit and pushsssssssss
+#tis is hold se namesless thing to commit and pushsssssssssssss
 # filename: app/hold_service.py
 
 import json
