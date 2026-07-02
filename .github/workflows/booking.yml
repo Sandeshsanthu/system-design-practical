@@ -4,7 +4,7 @@ on:
   push:
     branches: [ "main" ]
     paths:
-      - 'Booking-system/**'
+      - 'booking-system/**'
 
 permissions:
   contents: write
