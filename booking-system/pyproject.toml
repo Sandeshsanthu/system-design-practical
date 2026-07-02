@@ -1,0 +1,3 @@
+[tool.ruff]
+# Exclude the scripts directory from all checks
+exclude = ["scripts"]
