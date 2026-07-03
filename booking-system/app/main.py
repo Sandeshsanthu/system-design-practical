@@ -7,7 +7,8 @@ from fastapi import Depends, FastAPI, HTTPException, Query, WebSocket, WebSocket
 from fastapi.responses import HTMLResponse
 from sqlalchemy import text
 from sqlalchemy.orm import Session
-
+from fastapi import FastAPI, Request
+from starlette.middleware.base import BaseHTTPMiddleware
 from app.database import Base, engine, get_db
 from app.hold import HoldService
 from app.lock_service import acquire_lock
@@ -42,6 +43,23 @@ app = FastAPI(
 )
 
 app.middleware("http")(request_context_middleware)
+
+app_logger = logging.getLogger("booking-api")
+app_logger.setLevel(logging.INFO)
+
+class QuietRequestLoggingMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request: Request, call_next):
+        response = await call_next(request)
+        if request.url.path.startswith(("/health", "/realtime")):
+            return response
+        return response
+
+def configure_logging(app: FastAPI) -> None:
+    logging.basicConfig(
+        level=logging.INFO,
+        format='{"timestamp":"%(asctime)s","level":"%(levelname)s","logger":"%(name)s","message":"%(message)s"}',
+    )
+    app.add_middleware(QuietRequestLoggingMiddleware)
 
 REALTIME_HTML = """
 <!DOCTYPE html>
