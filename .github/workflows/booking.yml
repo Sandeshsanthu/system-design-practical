@@ -28,6 +28,7 @@ env:
   PYTHON_VERSION: "3.11"
   APP_DIR: booking-system
   IMAGE_NAME: ${{ secrets.DOCKERHUB_USERNAME }}/booking-system
+  TRIVY_IGNORE_FILE: ${{ github.workspace }}/.trivyignore
 
 jobs:
   lint:
@@ -38,6 +39,13 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+
+      - name: Verify Trivy ignore file exists
+        run: |
+          if [ ! -f "${TRIVY_IGNORE_FILE}" ]; then
+            echo "Missing ${TRIVY_IGNORE_FILE}"
+            exit 1
+          fi
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -71,6 +79,13 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Verify Trivy ignore file exists
+        run: |
+          if [ ! -f "${TRIVY_IGNORE_FILE}" ]; then
+            echo "Missing ${TRIVY_IGNORE_FILE}"
+            exit 1
+          fi
+
       - name: TruffleHog OSS
         if: github.event_name == 'push'
         uses: trufflesecurity/trufflehog@main
@@ -98,7 +113,7 @@ jobs:
           vuln-type: os,library
           severity: CRITICAL,HIGH
           scanners: vuln
-          trivyignores: .trivyignore
+          trivyignores: ${{ env.TRIVY_IGNORE_FILE }}
 
   unit-tests:
     name: Unit Tests
@@ -276,6 +291,13 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      - name: Verify Trivy ignore file exists
+        run: |
+          if [ ! -f "${TRIVY_IGNORE_FILE}" ]; then
+            echo "Missing ${TRIVY_IGNORE_FILE}"
+            exit 1
+          fi
+
       - name: Check Dockerfile exists
         id: dockerfile_check
         run: |
@@ -311,7 +333,7 @@ jobs:
           vuln-type: os,library
           severity: CRITICAL,HIGH
           scanners: vuln
-          trivyignores: .trivyignore
+          trivyignores: ${{ env.TRIVY_IGNORE_FILE }}
 
       - name: Log in to Docker Hub
         if: steps.dockerfile_check.outputs.exists == 'true'
