@@ -28,16 +28,26 @@ from app.websocket_manager import manager
 from models.models import Booking, Event, Payment, Seat
 from payment.payment_service import PaymentService
 
+from app.middleware.request_context import request_context_middleware
+from app.observability.logging_config import setup_logging
+
 Base.metadata.create_all(bind=engine)
 
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
+
+
+# logging.basicConfig(level=logging.INFO)
+# logger = logging.getLogger(__name__)
+
+setup_logging("INFO")
+logger = logging.getLogger("booking-api")
 
 app = FastAPI(
     title="Booking System with Payment",
     version="4.0.0",
     description="Production-style booking with Redis holds, payment integration, and realtime updates",
 )
+
+app.middleware("http")(request_context_middleware)
 
 REALTIME_HTML = """
 <!DOCTYPE html>
