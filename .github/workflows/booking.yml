@@ -94,12 +94,11 @@ jobs:
           scan-ref: ${{ env.APP_DIR }}
           format: table
           exit-code: "1"
-          ignorefile: .trivyignore
           ignore-unfixed: true
           vuln-type: os,library
           severity: CRITICAL,HIGH
           scanners: vuln
-          skip-version-check: true
+          trivyignores: .trivyignore
 
   unit-tests:
     name: Unit Tests
@@ -308,12 +307,11 @@ jobs:
           image-ref: ${{ env.IMAGE_NAME }}:${{ github.sha }}
           format: table
           exit-code: "1"
-          ignorefile: .trivyignore
           ignore-unfixed: true
           vuln-type: os,library
           severity: CRITICAL,HIGH
           scanners: vuln
-          skip-version-check: true
+          trivyignores: .trivyignore
 
       - name: Log in to Docker Hub
         if: steps.dockerfile_check.outputs.exists == 'true'
