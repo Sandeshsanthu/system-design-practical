@@ -28,6 +28,7 @@ jobs:
     name: Lint
     runs-on: ubuntu-latest
     timeout-minutes: 10
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -54,16 +55,18 @@ jobs:
         run: ruff check .
 
   security-scan:
-    name: Secret Guardrail Scan
+    name: Secret and Source Scan
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 15
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      - name: TruffleHog OSS
+      - name: TruffleHog OSS (push diff)
+        if: github.event_name == 'push'
         uses: trufflesecurity/trufflehog@main
         with:
           path: ./
@@ -71,20 +74,29 @@ jobs:
           head: ${{ github.sha }}
           extra_args: --only-verified
 
-      - name: Run Trivy vulnerability scanner
-        uses: aquasecurity/trivy-action@v0.28.0 # Fixed: Added the required 'v' prefix
+      - name: TruffleHog OSS (manual/full scan)
+        if: github.event_name != 'push'
+        uses: trufflesecurity/trufflehog@main
         with:
-          image-ref: '${{ env.IMAGE_NAME }}:${{ github.sha }}'
-          format: 'table'
-          exit-code: '1'
+          path: ./
+          extra_args: --only-verified
+
+      - name: Run Trivy filesystem scan
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          scan-type: fs
+          scan-ref: ${{ env.APP_DIR }}
+          format: table
+          exit-code: "1"
           ignore-unfixed: true
-          vuln-type: 'os,library'
-          severity: 'CRITICAL,HIGH'
+          vuln-type: library
+          severity: CRITICAL,HIGH
 
   unit-tests:
     name: Unit Tests
     runs-on: ubuntu-latest
     timeout-minutes: 15
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -124,6 +136,7 @@ jobs:
     name: Integration Tests
     runs-on: ubuntu-latest
     timeout-minutes: 20
+
     services:
       postgres:
         image: postgres:16
@@ -138,6 +151,7 @@ jobs:
           --health-interval 10s
           --health-timeout 5s
           --health-retries 5
+
       redis:
         image: redis:7
         ports:
@@ -147,6 +161,7 @@ jobs:
           --health-interval 10s
           --health-timeout 5s
           --health-retries 5
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -188,6 +203,7 @@ jobs:
     name: Migration Check
     runs-on: ubuntu-latest
     timeout-minutes: 15
+
     services:
       postgres:
         image: postgres:16
@@ -202,6 +218,7 @@ jobs:
           --health-interval 10s
           --health-timeout 5s
           --health-retries 5
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -237,7 +254,7 @@ jobs:
           fi
 
   docker-build-push:
-    name: Docker Build and Push
+    name: Docker Build, Scan, and Push
     runs-on: ubuntu-latest
     timeout-minutes: 30
     needs:
@@ -246,6 +263,7 @@ jobs:
       - unit-tests
       - integration-tests
       - migration-check
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -262,6 +280,28 @@ jobs:
       - name: Set up Docker Buildx
         if: steps.dockerfile_check.outputs.exists == 'true'
         uses: docker/setup-buildx-action@v3
+
+      - name: Build local image for scanning
+        if: steps.dockerfile_check.outputs.exists == 'true'
+        uses: docker/build-push-action@v6
+        with:
+          context: ./booking-system
+          file: ./booking-system/Dockerfile
+          load: true
+          tags: ${{ env.IMAGE_NAME }}:${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Run Trivy image scan
+        if: steps.dockerfile_check.outputs.exists == 'true'
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          image-ref: ${{ env.IMAGE_NAME }}:${{ github.sha }}
+          format: table
+          exit-code: "1"
+          ignore-unfixed: true
+          vuln-type: os,library
+          severity: CRITICAL,HIGH
 
       - name: Log in to Docker Hub
         if: steps.dockerfile_check.outputs.exists == 'true'
@@ -281,7 +321,6 @@ jobs:
             ${{ env.IMAGE_NAME }}:latest
             ${{ env.IMAGE_NAME }}:${{ github.sha }}
           cache-from: type=gha
-          cache-to: type=gha,mode=max
 
       - name: Skip Docker steps
         if: steps.dockerfile_check.outputs.exists != 'true'
