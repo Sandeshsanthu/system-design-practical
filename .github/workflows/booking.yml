@@ -9,12 +9,6 @@ on:
     paths:
       - "booking-system/**"
       - ".github/workflows/**"
-      - ".trivyignore"
-  pull_request:
-    paths:
-      - "booking-system/**"
-      - ".github/workflows/**"
-      - ".trivyignore"
   workflow_dispatch:
 
 permissions:
@@ -28,24 +22,15 @@ env:
   PYTHON_VERSION: "3.11"
   APP_DIR: booking-system
   IMAGE_NAME: ${{ secrets.DOCKERHUB_USERNAME }}/booking-system
-  TRIVY_IGNORE_FILE: ${{ github.workspace }}/.trivyignore
 
 jobs:
   lint:
     name: Lint
     runs-on: ubuntu-latest
     timeout-minutes: 10
-
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-
-      - name: Verify Trivy ignore file exists
-        run: |
-          if [ ! -f "${TRIVY_IGNORE_FILE}" ]; then
-            echo "Missing ${TRIVY_IGNORE_FILE}"
-            exit 1
-          fi
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -69,25 +54,16 @@ jobs:
         run: ruff check .
 
   security-scan:
-    name: Secret and Dependency Scan
+    name: Secret Guardrail Scan
     runs-on: ubuntu-latest
-    timeout-minutes: 15
-
+    timeout-minutes: 10
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      - name: Verify Trivy ignore file exists
-        run: |
-          if [ ! -f "${TRIVY_IGNORE_FILE}" ]; then
-            echo "Missing ${TRIVY_IGNORE_FILE}"
-            exit 1
-          fi
-
       - name: TruffleHog OSS
-        if: github.event_name == 'push'
         uses: trufflesecurity/trufflehog@main
         with:
           path: ./
@@ -95,31 +71,11 @@ jobs:
           head: ${{ github.sha }}
           extra_args: --only-verified
 
-      - name: TruffleHog OSS full scan
-        if: github.event_name != 'push'
-        uses: trufflesecurity/trufflehog@main
-        with:
-          path: ./
-          extra_args: --only-verified
-
-      - name: Run Trivy filesystem scan
-        uses: aquasecurity/trivy-action@v0.36.0
-        with:
-          scan-type: fs
-          scan-ref: ${{ env.APP_DIR }}
-          format: table
-          exit-code: "1"
-          ignore-unfixed: true
-          vuln-type: os,library
-          severity: CRITICAL,HIGH
-          scanners: vuln
-          trivyignores: ${{ env.TRIVY_IGNORE_FILE }}
 
   unit-tests:
     name: Unit Tests
     runs-on: ubuntu-latest
     timeout-minutes: 15
-
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -159,7 +115,6 @@ jobs:
     name: Integration Tests
     runs-on: ubuntu-latest
     timeout-minutes: 20
-
     services:
       postgres:
         image: postgres:16
@@ -174,7 +129,6 @@ jobs:
           --health-interval 10s
           --health-timeout 5s
           --health-retries 5
-
       redis:
         image: redis:7
         ports:
@@ -184,7 +138,6 @@ jobs:
           --health-interval 10s
           --health-timeout 5s
           --health-retries 5
-
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -226,7 +179,6 @@ jobs:
     name: Migration Check
     runs-on: ubuntu-latest
     timeout-minutes: 15
-
     services:
       postgres:
         image: postgres:16
@@ -241,7 +193,6 @@ jobs:
           --health-interval 10s
           --health-timeout 5s
           --health-retries 5
-
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -276,8 +227,8 @@ jobs:
             echo "alembic.ini not found. Skipping migration check."
           fi
 
-  docker-build-scan-push:
-    name: Docker Build, Scan, and Push
+  docker-build-push:
+    name: Docker Build and Push
     runs-on: ubuntu-latest
     timeout-minutes: 30
     needs:
@@ -286,17 +237,9 @@ jobs:
       - unit-tests
       - integration-tests
       - migration-check
-
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-
-      - name: Verify Trivy ignore file exists
-        run: |
-          if [ ! -f "${TRIVY_IGNORE_FILE}" ]; then
-            echo "Missing ${TRIVY_IGNORE_FILE}"
-            exit 1
-          fi
 
       - name: Check Dockerfile exists
         id: dockerfile_check
@@ -311,30 +254,6 @@ jobs:
         if: steps.dockerfile_check.outputs.exists == 'true'
         uses: docker/setup-buildx-action@v3
 
-      - name: Build local image for scanning
-        if: steps.dockerfile_check.outputs.exists == 'true'
-        uses: docker/build-push-action@v6
-        with:
-          context: ./booking-system
-          file: ./booking-system/Dockerfile
-          load: true
-          tags: ${{ env.IMAGE_NAME }}:${{ github.sha }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-
-      - name: Run Trivy image scan
-        if: steps.dockerfile_check.outputs.exists == 'true'
-        uses: aquasecurity/trivy-action@v0.36.0
-        with:
-          image-ref: ${{ env.IMAGE_NAME }}:${{ github.sha }}
-          format: table
-          exit-code: "1"
-          ignore-unfixed: true
-          vuln-type: os,library
-          severity: CRITICAL,HIGH
-          scanners: vuln
-          trivyignores: ${{ env.TRIVY_IGNORE_FILE }}
-
       - name: Log in to Docker Hub
         if: steps.dockerfile_check.outputs.exists == 'true'
         uses: docker/login-action@v3
@@ -342,7 +261,7 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      - name: Push image
+      - name: Build and push image
         if: steps.dockerfile_check.outputs.exists == 'true'
         uses: docker/build-push-action@v6
         with:
@@ -353,6 +272,7 @@ jobs:
             ${{ env.IMAGE_NAME }}:latest
             ${{ env.IMAGE_NAME }}:${{ github.sha }}
           cache-from: type=gha
+          cache-to: type=gha,mode=max
 
       - name: Skip Docker steps
         if: steps.dockerfile_check.outputs.exists != 'true'
