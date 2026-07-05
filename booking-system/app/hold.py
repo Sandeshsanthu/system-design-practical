@@ -1,6 +1,5 @@
 #tis is hold se namesless thing to commit and pushsssssssssssss
-# filename: app/hold_service.py
-
+# filename: app/hold.py
 import json
 import uuid
 from datetime import datetime, timedelta
@@ -8,6 +7,7 @@ from typing import Optional
 
 from app.config import settings
 from app.lock_service import redis_client
+from app.observability.metrics import record_hold_expiry
 
 
 class HoldService:
@@ -82,6 +82,7 @@ class HoldService:
     ) -> Optional[dict]:
         hold = HoldService.get_hold_by_token(hold_token)
         if not hold:
+            record_hold_expiry()
             return None
 
         if (
@@ -93,6 +94,7 @@ class HoldService:
 
         active_hold = HoldService.get_hold(event_id, seat_id)
         if not active_hold:
+            record_hold_expiry()
             return None
 
         if str(active_hold["hold_token"]) != str(hold_token):

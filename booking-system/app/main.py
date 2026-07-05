@@ -5,8 +5,9 @@
 import logging
 from typing import List, Optional
 
-from fastapi import Depends, FastAPI, HTTPException, Query, Request, WebSocket, WebSocketDisconnect
+from fastapi import Depends, FastAPI, HTTPException, Query, Request, Response, WebSocket, WebSocketDisconnect
 from fastapi.responses import HTMLResponse
+from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 from starlette.middleware.base import BaseHTTPMiddleware
@@ -17,6 +18,18 @@ from app.lock_service import acquire_lock
 from app.middleware.request_context import request_context_middleware
 from app.observability.context import bind_log_context, clear_log_context
 from app.observability.logging_config import setup_logging
+from app.observability.metrics import (
+    WEBSOCKET_CONNECTIONS_ACTIVE,
+    WEBSOCKET_CONNECTIONS_TOTAL,
+    observe_db_transaction,
+    record_booking,
+    record_hold_creation,
+    record_payment,
+    record_seat_attempt,
+    record_seat_conflict,
+    status_is_success,
+)
+from app.observability.metrics_middleware import prometheus_http_middleware
 from app.schemas import (
     BookingResponse,
     BookingWithPaymentCreate,
@@ -46,6 +59,12 @@ app = FastAPI(
 )
 
 app.middleware("http")(request_context_middleware)
+app.middleware("http")(prometheus_http_middleware)
+
+
+@app.get("/metrics")
+async def metrics():
+    return Response(generate_latest(), media_type=CONTENT_TYPE_LATEST)
 
 app_logger = logging.getLogger("booking-api")
 app_logger.setLevel(logging.INFO)
@@ -652,41 +671,49 @@ async def get_seat(event_id: str, seat_id: str, db: Session = Depends(get_db)):
 @app.post("/holds", response_model=HoldResponse, status_code=201)
 async def create_hold(request: HoldCreate, db: Session = Depends(get_db)):
     lock_resource = f"seat-hold:{request.event_id}:{request.seat_id}"
+    record_seat_attempt("hold")
 
     try:
         with acquire_lock(lock_resource, timeout=5):
-            seat = (
-                db.query(Seat)
-                .filter(
-                    Seat.event_id == request.event_id,
-                    Seat.seat_id == request.seat_id,
+            with observe_db_transaction("create_hold"):
+                seat = (
+                    db.query(Seat)
+                    .filter(
+                        Seat.event_id == request.event_id,
+                        Seat.seat_id == request.seat_id,
+                    )
+                    .first()
                 )
-                .first()
-            )
 
-            if not seat:
-                raise HTTPException(status_code=404, detail="Seat not found")
+                if not seat:
+                    record_hold_creation("failure")
+                    raise HTTPException(status_code=404, detail="Seat not found")
 
-            seat_status = seat.status.value if hasattr(seat.status, "value") else str(seat.status)
-            if str(seat_status).lower() == "booked":
-                raise HTTPException(status_code=409, detail="Seat already booked")
+                seat_status = seat.status.value if hasattr(seat.status, "value") else str(seat.status)
+                if str(seat_status).lower() == "booked":
+                    record_seat_conflict("hold", "already_booked")
+                    record_hold_creation("failure")
+                    raise HTTPException(status_code=409, detail="Seat already booked")
 
-            bind_log_context(
-                user_id=str(request.user_id),
-                event_id=str(request.event_id),
-                seat_id=str(request.seat_id),
-            )
+                bind_log_context(
+                    user_id=str(request.user_id),
+                    event_id=str(request.event_id),
+                    seat_id=str(request.seat_id),
+                )
 
-            created, hold = HoldService.create_hold(
-                user_id=str(request.user_id),
-                event_id=str(request.event_id),
-                seat_id=str(request.seat_id),
-                ttl_seconds=request.ttl_seconds,
-            )
+                created, hold = HoldService.create_hold(
+                    user_id=str(request.user_id),
+                    event_id=str(request.event_id),
+                    seat_id=str(request.seat_id),
+                    ttl_seconds=request.ttl_seconds,
+                )
 
-            if not created:
-                raise HTTPException(status_code=409, detail="Seat already held")
+                if not created:
+                    record_seat_conflict("hold", "already_held")
+                    record_hold_creation("failure")
+                    raise HTTPException(status_code=409, detail="Seat already held")
 
+        record_hold_creation("success")
         logger.info("hold_created")
 
         await manager.broadcast_to_event(
@@ -708,6 +735,7 @@ async def create_hold(request: HoldCreate, db: Session = Depends(get_db)):
     except HTTPException:
         raise
     except Exception as exc:
+        record_hold_creation("failure")
         logger.exception("hold_creation_failed")
         raise HTTPException(status_code=500, detail=f"Hold creation failed: {str(exc)}")
 
@@ -748,9 +776,12 @@ async def create_booking_with_payment(
 ):
     payment_method = normalize_payment_method(booking_request.payment_method)
     payment_details = {}
+    record_seat_attempt("booking")
 
     if payment_method in {"credit_card", "debit_card"}:
         if not booking_request.card_details:
+            record_booking("failure")
+            record_payment("failure")
             raise HTTPException(status_code=400, detail="Card details required")
         payment_details = {
             "card_number": booking_request.card_details.card_number,
@@ -761,20 +792,28 @@ async def create_booking_with_payment(
         }
     elif payment_method == "upi":
         if not booking_request.upi_details:
+            record_booking("failure")
+            record_payment("failure")
             raise HTTPException(status_code=400, detail="UPI details required")
         payment_details = {"upi_id": booking_request.upi_details.upi_id}
     elif payment_method == "net_banking":
         if not booking_request.netbanking_details:
+            record_booking("failure")
+            record_payment("failure")
             raise HTTPException(status_code=400, detail="Net banking details required")
         payment_details = {"bank_code": booking_request.netbanking_details.bank_code}
     elif payment_method == "wallet":
         if not booking_request.wallet_details:
+            record_booking("failure")
+            record_payment("failure")
             raise HTTPException(status_code=400, detail="Wallet details required")
         payment_details = {
             "wallet_id": booking_request.wallet_details.wallet_id,
             "wallet_provider": booking_request.wallet_details.wallet_provider,
         }
     else:
+        record_booking("failure")
+        record_payment("failure")
         raise HTTPException(status_code=400, detail=f"Unsupported payment method: {payment_method}")
 
     bind_log_context(
@@ -784,21 +823,40 @@ async def create_booking_with_payment(
         hold_token=str(booking_request.hold_token),
     )
 
-    booking, payment, result = PaymentService.create_booking_with_payment(
-        db=db,
-        user_id=str(booking_request.user_id),
-        event_id=str(booking_request.event_id),
-        seat_id=str(booking_request.seat_id),
-        payment_method=payment_method,
-        payment_details=payment_details,
-        hold_token=booking_request.hold_token,
-        idempotency_key=booking_request.idempotency_key,
-    )
+    try:
+        with observe_db_transaction("create_booking_with_payment"):
+            booking, payment, result = PaymentService.create_booking_with_payment(
+                db=db,
+                user_id=str(booking_request.user_id),
+                event_id=str(booking_request.event_id),
+                seat_id=str(booking_request.seat_id),
+                payment_method=payment_method,
+                payment_details=payment_details,
+                hold_token=booking_request.hold_token,
+                idempotency_key=booking_request.idempotency_key,
+            )
+    except HTTPException as exc:
+        record_booking("failure")
+        record_payment("failure")
+        if exc.status_code == 409:
+            record_seat_conflict("booking", "booking_conflict")
+        raise
+    except Exception:
+        record_booking("failure")
+        record_payment("failure")
+        logger.exception("booking_with_payment_failed")
+        raise
 
     bind_log_context(
         booking_id=getattr(booking, "booking_id", None),
         payment_id=getattr(payment, "payment_id", None) if payment else None,
     )
+
+    booking_success = status_is_success(getattr(booking, "status", None)) or status_is_success(result)
+    payment_success = status_is_success(getattr(payment, "status", None)) if payment else False
+
+    record_booking("success" if booking_success else "failure")
+    record_payment("success" if payment_success else "failure")
 
     logger.info(
         "booking_created result=%s booking_id=%s payment_id=%s",
@@ -860,6 +918,8 @@ async def websocket_endpoint(websocket: WebSocket, event_id: str):
     bind_log_context(event_id=str(event_id))
 
     await manager.connect(websocket, event_id)
+    WEBSOCKET_CONNECTIONS_TOTAL.inc()
+    WEBSOCKET_CONNECTIONS_ACTIVE.inc()
     logger.info("websocket_connected")
 
     try:
@@ -879,6 +939,7 @@ async def websocket_endpoint(websocket: WebSocket, event_id: str):
         logger.error("websocket_error event_id=%s error=%s", event_id, exc)
         manager.disconnect(websocket, event_id)
     finally:
+        WEBSOCKET_CONNECTIONS_ACTIVE.dec()
         clear_log_context()
 
 
