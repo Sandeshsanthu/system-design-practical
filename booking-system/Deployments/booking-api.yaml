@@ -46,7 +46,7 @@ spec:
                     app: booking-api
       containers:
         - name: booking-api
-          image: sandeshs/booking-system:5a3b646c66efb83901e20f1b0b36a3f139306778
+          image: sandeshs/booking-system:4f49fccf5986237a397d58691088a30c91dc994e
           imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 8000
