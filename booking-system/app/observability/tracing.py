@@ -5,12 +5,17 @@ import os
 from opentelemetry import trace
 from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter
 from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
-from opentelemetry.instrumentation.httpx import HTTPXClientInstrumentor
 from opentelemetry.instrumentation.requests import RequestsInstrumentor
 from opentelemetry.instrumentation.sqlalchemy import SQLAlchemyInstrumentor
 from opentelemetry.sdk.resources import Resource
 from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.sdk.trace.export import BatchSpanProcessor
+
+try:
+    from opentelemetry.instrumentation.httpx import HTTPXClientInstrumentor
+    HTTPX_ENABLED = True
+except ModuleNotFoundError:
+    HTTPX_ENABLED = False
 
 _TRACING_INITIALIZED = False
 
@@ -42,7 +47,9 @@ def init_tracing(app, engine) -> None:
     FastAPIInstrumentor.instrument_app(app, excluded_urls="/health,/metrics")
     SQLAlchemyInstrumentor().instrument(engine=engine)
     RequestsInstrumentor().instrument()
-    HTTPXClientInstrumentor().instrument()
+
+    if HTTPX_ENABLED:
+        HTTPXClientInstrumentor().instrument()
 
     _TRACING_INITIALIZED = True
 
