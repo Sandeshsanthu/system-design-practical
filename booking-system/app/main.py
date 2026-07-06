@@ -46,6 +46,9 @@ from app.websocket_manager import manager
 from models.models import Booking, Event, Payment, Seat
 from payment.payment_service import PaymentService
 
+from app.observability.tracing import init_tracing
+
+
 
 Base.metadata.create_all(bind=engine)
 
@@ -61,6 +64,8 @@ app = FastAPI(
 app.middleware("http")(request_context_middleware)
 app.middleware("http")(prometheus_http_middleware)
 
+#open telemeter
+init_tracing(app, engine)
 
 @app.get("/metrics")
 async def metrics():
