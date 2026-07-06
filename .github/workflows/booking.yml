@@ -277,3 +277,40 @@ jobs:
       - name: Skip Docker steps
         if: steps.dockerfile_check.outputs.exists != 'true'
         run: echo "Dockerfile not found. Skipping Docker build and push."
+
+
+  update-k8s-manifests:
+    name: Update K8s Manifests
+    needs: docker-build-push
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Setup Kustomize
+        run: |
+          curl -s "https://raw.githubusercontent.com/kubernetes-sigs/kustomize/master/hack/install_kustomize.sh" | bash
+          sudo mv kustomize /usr/local/bin/
+
+      - name: Update booking image tag
+        run: |
+          cd booking-system/k8s
+          kustomize edit set image sandeshs/booking-system=sandeshs/booking-system:${{ github.sha }}
+
+      - name: Commit and Push
+        run: |
+          git config --global user.name "GitOps Bot"
+          git config --global user.email "gitops-bot@github.com"
+          git add booking-system/k8s/kustomization.yaml
+          
+          if git diff --staged --quiet; then
+            echo "No changes to commit"
+          else
+            git commit -m "Deploy booking-system ${GITHUB_SHA:0:7} [skip ci]"
+            git push
+          fi
