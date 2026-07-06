@@ -299,14 +299,14 @@ jobs:
 
       - name: Update booking image tag
         run: |
-          cd booking-system/k8s
+          cd booking-system/Deployments
           kustomize edit set image sandeshs/booking-system=sandeshs/booking-system:${{ github.sha }}
 
       - name: Commit and Push
         run: |
           git config --global user.name "GitOps Bot"
           git config --global user.email "gitops-bot@github.com"
-          git add booking-system/k8s/kustomization.yaml
+          git add booking-system/Deployments/kustomization.yaml
           
           if git diff --staged --quiet; then
             echo "No changes to commit"
