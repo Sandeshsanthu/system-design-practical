@@ -57,58 +57,81 @@ spec:
                 configMapKeyRef:
                   name: booking-config
                   key: PYTHONPATH
+
             - name: DATABASE_URL
               valueFrom:
                 secretKeyRef:
                   name: booking-secrets
                   key: DATABASE_URL
+
             - name: REDIS_URL
               valueFrom:
                 secretKeyRef:
                   name: booking-secrets
                   key: REDIS_URL
+
             - name: PAYMENT_GATEWAY_BASE_URL
               valueFrom:
                 configMapKeyRef:
                   name: booking-config
                   key: PAYMENT_GATEWAY_BASE_URL
+
             - name: PAYMENT_GATEWAY_API_KEY
               valueFrom:
                 secretKeyRef:
                   name: booking-secrets
                   key: PAYMENT_GATEWAY_API_KEY
+
             - name: HOLD_TTL_SECONDS
               valueFrom:
                 configMapKeyRef:
                   name: booking-config
                   key: HOLD_TTL_SECONDS
+
             - name: LOG_LEVEL
               valueFrom:
                 configMapKeyRef:
                   name: booking-config
                   key: LOG_LEVEL
+
             - name: DEBUG
               valueFrom:
                 configMapKeyRef:
                   name: booking-config
                   key: DEBUG
+
+            - name: OTEL_SERVICE_NAME
+              value: "booking-api"
+
+            - name: OTEL_TRACES_EXPORTER
+              value: "otlp"
+
+            - name: OTEL_EXPORTER_OTLP_PROTOCOL
+              value: "http/protobuf"
+
+            - name: OTEL_EXPORTER_OTLP_TRACES_ENDPOINT
+              value: "http://otel-collector.observability.svc.cluster.local:4318/v1/traces"
+
           readinessProbe:
             tcpSocket:
               port: 8000
             initialDelaySeconds: 10
             periodSeconds: 5
             timeoutSeconds: 2
+
           livenessProbe:
             tcpSocket:
               port: 8000
             initialDelaySeconds: 20
             periodSeconds: 10
             timeoutSeconds: 2
+
           startupProbe:
             tcpSocket:
               port: 8000
             failureThreshold: 30
             periodSeconds: 5
+
           resources:
             requests:
               cpu: 250m

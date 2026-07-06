@@ -17,6 +17,12 @@ try:
 except ModuleNotFoundError:
     HTTPX_ENABLED = False
 
+try:
+    from opentelemetry.instrumentation.redis import RedisInstrumentor
+    REDIS_ENABLED = True
+except ModuleNotFoundError:
+    REDIS_ENABLED = False
+
 _TRACING_INITIALIZED = False
 
 
@@ -50,6 +56,9 @@ def init_tracing(app, engine) -> None:
 
     if HTTPX_ENABLED:
         HTTPXClientInstrumentor().instrument()
+
+    if REDIS_ENABLED:
+        RedisInstrumentor().instrument()
 
     _TRACING_INITIALIZED = True
 
