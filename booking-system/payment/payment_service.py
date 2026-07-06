@@ -12,7 +12,7 @@ from fastapi import HTTPException
 from opentelemetry.trace import Status, StatusCode
 from sqlalchemy import and_
 from sqlalchemy.orm import Session
-
+import  time
 from app.hold import HoldService
 from app.lock_service import acquire_lock
 from app.observability.tracing import get_tracer
@@ -32,9 +32,15 @@ from payment.payment_gateway import MockPaymentGateway
 
 logger = logging.getLogger(__name__)
 tracer = get_tracer(__name__)
+from app.observability.slo_metrics import observe_payment_completion_latency
+
+
+payment_started = time.perf_counter()
+payment_outcome = "success"
 
 
 class PaymentService:
+  try:
     @staticmethod
     def _normalize_payment_method(payment_method: Any) -> str:
         if hasattr(payment_method, "value"):
@@ -487,3 +493,11 @@ class PaymentService:
                 span.set_status(Status(StatusCode.ERROR, str(exc)))
                 logger.exception("Refund transaction failed | type=%s repr=%r", type(exc).__name__, exc)
                 raise HTTPException(status_code=500, detail=f"Refund failed: {type(exc).__name__}: {str(exc)}")
+  except Exception:
+      payment_outcome = "failure"
+      raise
+  finally:
+      observe_payment_completion_latency(
+          time.perf_counter() - payment_started,
+          payment_outcome,
+      )
