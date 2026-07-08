@@ -1,0 +1,98 @@
+# filename: prometheus-rules.yaml
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: slo-recording-rules
+  namespace: monitoring
+  labels:
+    prometheus: kube-prometheus
+    role: alert-rules
+spec:
+  groups:
+    - name: sli_recording_rules
+      interval: 30s
+      rules:
+        # Booking API SLIs
+        - record: sli:booking_api:success_rate:5m
+          expr: |
+            sum(rate(booking_api_results_total{outcome="success"}[5m])) /
+            sum(rate(booking_api_results_total[5m])) * 100
+        
+        - record: sli:booking_api:error_rate:5m
+          expr: |
+            sum(rate(booking_api_results_total{outcome!="success"}[5m])) /
+            sum(rate(booking_api_results_total[5m])) * 100
+        
+        - record: sli:booking_api:latency:p95:5m
+          expr: |
+            histogram_quantile(0.95,
+              sum(rate(booking_api_latency_seconds_bucket[5m])) by (le)
+            )
+        
+        - record: sli:booking_api:latency:p99:5m
+          expr: |
+            histogram_quantile(0.99,
+              sum(rate(booking_api_latency_seconds_bucket[5m])) by (le)
+            )
+
+        # Hold API SLIs
+        - record: sli:hold_api:success_rate:5m
+          expr: |
+            sum(rate(hold_api_results_total{outcome="success"}[5m])) /
+            sum(rate(hold_api_results_total[5m])) * 100
+        
+        - record: sli:hold_api:error_rate:5m
+          expr: |
+            sum(rate(hold_api_results_total{outcome!="success"}[5m])) /
+            sum(rate(hold_api_results_total[5m])) * 100
+
+        # Payment SLIs
+        - record: sli:payment:completion_latency:p95:5m
+          expr: |
+            histogram_quantile(0.95,
+              sum(rate(payment_completion_latency_seconds_bucket{outcome="success"}[5m])) by (le)
+            )
+        
+        - record: sli:payment:success_rate:5m
+          expr: |
+            sum(rate(payment_total{result="success"}[5m])) /
+            sum(rate(payment_total[5m])) * 100
+
+        # Dependency SLIs
+        - record: sli:redis:availability:5m
+          expr: avg_over_time(dependency_up{dependency="redis"}[5m]) * 100
+        
+        - record: sli:postgres:availability:5m
+          expr: avg_over_time(dependency_up{dependency="postgres"}[5m]) * 100
+
+    # Error Budget Calculations (30-day window)
+    - name: slo_error_budget
+      interval: 2m
+      rules:
+        # Booking API - 99.9% SLO (0.1% error budget)
+        - record: slo:booking_api:error_budget_remaining:30d
+          expr: |
+            1 - (
+              (1 - 0.999) - 
+              (1 - (
+                sum(increase(booking_api_results_total{outcome="success"}[30d])) /
+                sum(increase(booking_api_results_total[30d]))
+              ))
+            ) / (1 - 0.999)
+        
+        # Hold API - 99.90% SLO (0.1% error budget)
+        - record: slo:hold_api:error_budget_remaining:30d
+          expr: |
+            1 - (
+              (1 - 0.999) - 
+              (1 - (
+                sum(increase(hold_api_results_total{outcome="success"}[30d])) /
+                sum(increase(hold_api_results_total[30d]))
+              ))
+            ) / (1 - 0.999)
+
+        # Booking Latency SLO - P95 < 3s (95% of requests)
+        - record: slo:booking_api:latency_slo:compliance:30d
+          expr: |
+            sum(increase(booking_api_latency_seconds_bucket{le="3.0"}[30d])) /
+            sum(increase(booking_api_latency_seconds_count[30d])) * 100

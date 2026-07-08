@@ -1,0 +1,101 @@
+# filename: prometheus-alerts.yaml
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: slo-alerts
+  namespace: monitoring
+  labels:
+    prometheus: kube-prometheus
+    role: alert-rules
+spec:
+  groups:
+    - name: slo_alerts
+      interval: 1m
+      rules:
+        # Booking API SLO Violations
+        - alert: BookingAPIHighErrorRate
+          expr: sli:booking_api:success_rate:5m < 99.9
+          for: 5m
+          labels:
+            severity: critical
+            slo: booking_api_availability
+          annotations:
+            summary: "Booking API success rate below SLO"
+            description: "Booking API success rate is {{ $value | humanizePercentage }}, below 99.9% SLO target"
+        
+        - alert: BookingAPILatencySLOViolation
+          expr: sli:booking_api:latency:p95:5m > 3.0
+          for: 5m
+          labels:
+            severity: warning
+            slo: booking_api_latency
+          annotations:
+            summary: "Booking API P95 latency exceeds SLO"
+            description: "Booking API P95 latency is {{ $value | humanizeDuration }}, exceeding 3s SLO target"
+        
+        - alert: BookingAPIErrorBudgetCritical
+          expr: slo:booking_api:error_budget_remaining:30d < 0.1
+          for: 5m
+          labels:
+            severity: critical
+            slo: booking_api_error_budget
+          annotations:
+            summary: "Booking API error budget nearly exhausted"
+            description: "Only {{ $value | humanizePercentage }} of error budget remains for the 30-day window"
+
+        # Hold API SLO Violations
+        - alert: HoldAPIHighErrorRate
+          expr: sli:hold_api:success_rate:5m < 99.9
+          for: 5m
+          labels:
+            severity: critical
+            slo: hold_api_availability
+          annotations:
+            summary: "Hold API success rate below SLO"
+            description: "Hold API success rate is {{ $value | humanizePercentage }}, below 99.9% SLO target"
+        
+        - alert: HoldAPIErrorBudgetCritical
+          expr: slo:hold_api:error_budget_remaining:30d < 0.1
+          for: 5m
+          labels:
+            severity: critical
+            slo: hold_api_error_budget
+          annotations:
+            summary: "Hold API error budget nearly exhausted"
+            description: "Only {{ $value | humanizePercentage }} of error budget remains"
+
+        # Dependency SLO Violations
+        - alert: RedisDependencyDown
+          expr: sli:redis:availability:5m < 99.9
+          for: 2m
+          labels:
+            severity: critical
+            slo: redis_availability
+          annotations:
+            summary: "Redis availability below SLO"
+            description: "Redis availability is {{ $value | humanizePercentage }}, below 99.9% target"
+        
+        - alert: PostgresDependencyDown
+          expr: sli:postgres:availability:5m < 99.9
+          for: 2m
+          labels:
+            severity: critical
+            slo: postgres_availability
+          annotations:
+            summary: "PostgreSQL availability below SLO"
+            description: "PostgreSQL availability is {{ $value | humanizePercentage }}, below 99.9% target"
+
+        # Multi-window Multi-burn-rate Alerts (Fast burn detection)
+        - alert: BookingAPIErrorBudgetBurnFast
+          expr: |
+            (
+              sli:booking_api:error_rate:5m > (0.1 * 14.4) and
+              sli:booking_api:error_rate:5m > (0.1 * 14.4)
+            )
+          for: 2m
+          labels:
+            severity: critical
+            slo: booking_api_burn_rate
+          annotations:
+            summary: "Booking API burning through error budget rapidly"
+            description: "At current error rate, error budget will be exhausted in < 2 hours"

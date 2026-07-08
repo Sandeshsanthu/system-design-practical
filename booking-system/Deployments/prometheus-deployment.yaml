@@ -1,0 +1,392 @@
+# filename: prometheus-deployment.yaml
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: monitoring
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: prometheus-config
+  namespace: monitoring
+data:
+  prometheus.yml: |
+    global:
+      scrape_interval: 15s
+      evaluation_interval: 15s
+      external_labels:
+        cluster: 'kind-local'
+        environment: 'local'
+
+    # Load recording and alerting rules
+    rule_files:
+      - /etc/prometheus/rules/*.yml
+
+    # Scrape configurations
+    scrape_configs:
+      # Scrape Prometheus itself
+      - job_name: 'prometheus'
+        static_configs:
+          - targets: ['localhost:9090']
+
+      # Scrape your booking API
+      - job_name: 'booking-api'
+        kubernetes_sd_configs:
+          - role: pod
+            namespaces:
+              names:
+                - booking
+        relabel_configs:
+          # Only scrape pods with the correct labels
+          - source_labels: [__meta_kubernetes_pod_label_app]
+            action: keep
+            regex: booking-api
+          # Only scrape containers with a metrics port
+          - source_labels: [__meta_kubernetes_pod_container_port_name]
+            action: keep
+            regex: metrics
+          # Set the scrape address
+          - source_labels: [__meta_kubernetes_pod_ip]
+            action: replace
+            target_label: __address__
+            replacement: ${1}:8000
+          # Add useful labels
+          - source_labels: [__meta_kubernetes_namespace]
+            target_label: namespace
+          - source_labels: [__meta_kubernetes_pod_name]
+            target_label: pod
+          - source_labels: [__meta_kubernetes_pod_label_app]
+            target_label: app
+
+      # Scrape Redis exporter (if you add one)
+      - job_name: 'redis'
+        kubernetes_sd_configs:
+          - role: pod
+            namespaces:
+              names:
+                - booking
+        relabel_configs:
+          - source_labels: [__meta_kubernetes_pod_label_app]
+            action: keep
+            regex: redis
+
+      # Scrape Postgres exporter (if you add one)
+      - job_name: 'postgres'
+        kubernetes_sd_configs:
+          - role: pod
+            namespaces:
+              names:
+                - booking
+        relabel_configs:
+          - source_labels: [__meta_kubernetes_pod_label_app]
+            action: keep
+            regex: postgres
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: prometheus-rules
+  namespace: monitoring
+data:
+  slo-rules.yml: |
+    groups:
+      - name: sli_recording_rules
+        interval: 30s
+        rules:
+          # Booking API SLIs
+          - record: sli:booking_api:success_rate:5m
+            expr: |
+              (
+                sum(rate(booking_api_results_total{outcome="success"}[5m])) /
+                sum(rate(booking_api_results_total[5m]))
+              ) * 100
+          
+          - record: sli:booking_api:error_rate:5m
+            expr: |
+              (
+                sum(rate(booking_api_results_total{outcome!="success"}[5m])) /
+                sum(rate(booking_api_results_total[5m]))
+              ) * 100
+          
+          - record: sli:booking_api:latency:p95:5m
+            expr: |
+              histogram_quantile(0.95,
+                sum(rate(booking_api_latency_seconds_bucket[5m])) by (le)
+              )
+          
+          - record: sli:booking_api:latency:p99:5m
+            expr: |
+              histogram_quantile(0.99,
+                sum(rate(booking_api_latency_seconds_bucket[5m])) by (le)
+              )
+
+          # Hold API SLIs
+          - record: sli:hold_api:success_rate:5m
+            expr: |
+              (
+                sum(rate(hold_api_results_total{outcome="success"}[5m])) /
+                sum(rate(hold_api_results_total[5m]))
+              ) * 100
+          
+          - record: sli:hold_api:error_rate:5m
+            expr: |
+              (
+                sum(rate(hold_api_results_total{outcome!="success"}[5m])) /
+                sum(rate(hold_api_results_total[5m]))
+              ) * 100
+
+          # Payment SLIs
+          - record: sli:payment:completion_latency:p95:5m
+            expr: |
+              histogram_quantile(0.95,
+                sum(rate(payment_completion_latency_seconds_bucket{outcome="success"}[5m])) by (le)
+              )
+          
+          - record: sli:payment:success_rate:5m
+            expr: |
+              (
+                sum(rate(payment_total{result="success"}[5m])) /
+                sum(rate(payment_total[5m]))
+              ) * 100
+
+          # Dependency SLIs
+          - record: sli:redis:availability:5m
+            expr: avg_over_time(dependency_up{dependency="redis"}[5m]) * 100
+          
+          - record: sli:postgres:availability:5m
+            expr: avg_over_time(dependency_up{dependency="postgres"}[5m]) * 100
+
+      # Error Budget Calculations (30-day window)
+      - name: slo_error_budget
+        interval: 2m
+        rules:
+          # Booking API - 99.9% SLO (0.1% error budget)
+          - record: slo:booking_api:error_budget_remaining:30d
+            expr: |
+              1 - (
+                (1 - 0.999) - 
+                (1 - (
+                  sum(increase(booking_api_results_total{outcome="success"}[30d])) /
+                  sum(increase(booking_api_results_total[30d]))
+                ))
+              ) / (1 - 0.999)
+          
+          # Hold API - 99.90% SLO (0.1% error budget)
+          - record: slo:hold_api:error_budget_remaining:30d
+            expr: |
+              1 - (
+                (1 - 0.999) - 
+                (1 - (
+                  sum(increase(hold_api_results_total{outcome="success"}[30d])) /
+                  sum(increase(hold_api_results_total[30d]))
+                ))
+              ) / (1 - 0.999)
+
+          # Booking Latency SLO - P95 < 3s (95% of requests)
+          - record: slo:booking_api:latency_slo:compliance:30d
+            expr: |
+              (
+                sum(increase(booking_api_latency_seconds_bucket{le="3.0"}[30d])) /
+                sum(increase(booking_api_latency_seconds_count[30d]))
+              ) * 100
+
+  alerts.yml: |
+    groups:
+      - name: slo_alerts
+        interval: 1m
+        rules:
+          # Booking API SLO Violations
+          - alert: BookingAPIHighErrorRate
+            expr: sli:booking_api:success_rate:5m < 99.9
+            for: 5m
+            labels:
+              severity: critical
+              slo: booking_api_availability
+            annotations:
+              summary: "Booking API success rate below SLO"
+              description: "Booking API success rate is {{ $value }}%, below 99.9% SLO target"
+          
+          - alert: BookingAPILatencySLOViolation
+            expr: sli:booking_api:latency:p95:5m > 3.0
+            for: 5m
+            labels:
+              severity: warning
+              slo: booking_api_latency
+            annotations:
+              summary: "Booking API P95 latency exceeds SLO"
+              description: "Booking API P95 latency is {{ $value }}s, exceeding 3s SLO target"
+          
+          - alert: BookingAPIErrorBudgetCritical
+            expr: slo:booking_api:error_budget_remaining:30d < 0.1
+            for: 5m
+            labels:
+              severity: critical
+              slo: booking_api_error_budget
+            annotations:
+              summary: "Booking API error budget nearly exhausted"
+              description: "Only {{ $value | humanizePercentage }} of error budget remains for the 30-day window"
+
+          # Hold API SLO Violations
+          - alert: HoldAPIHighErrorRate
+            expr: sli:hold_api:success_rate:5m < 99.9
+            for: 5m
+            labels:
+              severity: critical
+              slo: hold_api_availability
+            annotations:
+              summary: "Hold API success rate below SLO"
+              description: "Hold API success rate is {{ $value }}%, below 99.9% SLO target"
+
+          # Dependency SLO Violations
+          - alert: RedisDependencyDown
+            expr: sli:redis:availability:5m < 99.9
+            for: 2m
+            labels:
+              severity: critical
+              slo: redis_availability
+            annotations:
+              summary: "Redis availability below SLO"
+              description: "Redis availability is {{ $value }}%, below 99.9% target"
+          
+          - alert: PostgresDependencyDown
+            expr: sli:postgres:availability:5m < 99.9
+            for: 2m
+            labels:
+              severity: critical
+              slo: postgres_availability
+            annotations:
+              summary: "PostgreSQL availability below SLO"
+              description: "PostgreSQL availability is {{ $value }}%, below 99.9% target"
+
+          # Multi-window Multi-burn-rate Alerts (Fast burn detection)
+          - alert: BookingAPIErrorBudgetBurnFast
+            expr: |
+              (
+                sli:booking_api:error_rate:5m > (0.1 * 14.4)
+              )
+            for: 2m
+            labels:
+              severity: critical
+              slo: booking_api_burn_rate
+            annotations:
+              summary: "Booking API burning through error budget rapidly"
+              description: "At current error rate ({{ $value }}%), error budget will be exhausted quickly"
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: prometheus
+rules:
+  - apiGroups: [""]
+    resources:
+      - nodes
+      - nodes/proxy
+      - services
+      - endpoints
+      - pods
+    verbs: ["get", "list", "watch"]
+  - apiGroups:
+      - extensions
+    resources:
+      - ingresses
+    verbs: ["get", "list", "watch"]
+  - nonResourceURLs: ["/metrics"]
+    verbs: ["get"]
+
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: prometheus
+  namespace: monitoring
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: prometheus
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: prometheus
+subjects:
+  - kind: ServiceAccount
+    name: prometheus
+    namespace: monitoring
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: prometheus
+  namespace: monitoring
+  labels:
+    app: prometheus
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: prometheus
+  template:
+    metadata:
+      labels:
+        app: prometheus
+    spec:
+      serviceAccountName: prometheus
+      containers:
+        - name: prometheus
+          image: prom/prometheus:v2.48.0
+          args:
+            - '--config.file=/etc/prometheus/prometheus.yml'
+            - '--storage.tsdb.path=/prometheus'
+            - '--storage.tsdb.retention.time=30d'
+            - '--web.console.libraries=/usr/share/prometheus/console_libraries'
+            - '--web.console.templates=/usr/share/prometheus/consoles'
+            - '--web.enable-lifecycle'
+          ports:
+            - containerPort: 9090
+              name: web
+          volumeMounts:
+            - name: prometheus-config
+              mountPath: /etc/prometheus/prometheus.yml
+              subPath: prometheus.yml
+            - name: prometheus-rules
+              mountPath: /etc/prometheus/rules
+            - name: prometheus-storage
+              mountPath: /prometheus
+          resources:
+            requests:
+              memory: "512Mi"
+              cpu: "250m"
+            limits:
+              memory: "1Gi"
+              cpu: "500m"
+      volumes:
+        - name: prometheus-config
+          configMap:
+            name: prometheus-config
+        - name: prometheus-rules
+          configMap:
+            name: prometheus-rules
+        - name: prometheus-storage
+          emptyDir: {}
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: prometheus
+  namespace: monitoring
+  labels:
+    app: prometheus
+spec:
+  type: NodePort
+  ports:
+    - port: 9090
+      targetPort: 9090
+      nodePort: 30090
+      name: web
+  selector:
+    app: prometheus
