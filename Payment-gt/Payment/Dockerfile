@@ -10,7 +10,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libpq-dev \
     && rm -rf /var/lib/apt/lists/*
 
-RUN pip install --no-cache-dir fastapi uvicorn sqlalchemy psycopg2-binary pydantic httpx redis
+RUN pip install --no-cache-dir fastapi uvicorn sqlalchemy psycopg2-binary pydantic httpx redis pydantic[email]
 
 COPY . .
 

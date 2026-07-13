@@ -13,13 +13,15 @@ MERCHANT = {
     ("POST", "captures"): "captures:create",
     ("POST", "refunds"): "refunds:create",
     ("GET", "payments"): "payments:read",
-    ("GET", "balance"): "balance:read"
+    ("GET", "balance"): "balance:read",
+    ("POST", "voids"): "voids:create"
 }
 CUSTOMER = {
     ("POST", "payment_sessions"): "payment_session:create",
+    ("GET", "payment_sessions"): "payment_session:read_own",
     ("POST", "payment_methods/tokenize"): "payment_method:tokenize",
     ("POST", "payment_intents/confirm"): "payment_intent:confirm_own",
-    ("GET", "config"): "public_config:read"
+    ("GET", "config"): "public_config:read",
 }
 
 def scope_for(method: str, path: str, rules: dict) -> str | None:

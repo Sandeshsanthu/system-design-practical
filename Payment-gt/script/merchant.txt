@@ -1,0 +1,32 @@
+$createBody = @{
+  amount = 1000
+  currency = "usd"
+  customer = @{
+    email = "test@example.com"
+    name = "Test User"
+    phone = "9999999999"
+  }
+  card = @{
+    number = "4242424242424242"
+    exp_month = 12
+    exp_year = 2028
+    cvc = "123"
+  }
+  order_id = "ord_e2e_001"
+  description = "End to end test payment"
+  metadata = @{
+    source = "gateway-e2e"
+    suite = "full-flow"
+  }
+  capture = $false
+} | ConvertTo-Json -Depth 5
+
+$createResponse = Invoke-RestMethod -Method Post `
+  -Uri "http://localhost:8080/v1/merchant/payment_intents" `
+  -Headers @{ Authorization = "Bearer sk_test_123" } `
+  -ContentType "application/json" `
+  -Body $createBody
+
+$createResponse
+$paymentId = $createResponse.payment_id
+$paymentId
