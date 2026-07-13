@@ -9,4 +9,4 @@ resources:
 images:
 - name: sandeshs/booking-system
   newName: sandeshs/booking-system
-  newTag: 3981dc1119088f7a9a03039bfc0902570e893039
+  newTag: 9807c392453038058c1294e65fd5ebe3fab274e1
