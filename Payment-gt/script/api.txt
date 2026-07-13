@@ -1,7 +1,7 @@
 PS C:\Users\sandeshs> $resp = Invoke-RestMethod -Method Post `
->>   -Uri http://localhost:9000/token `
->>   -ContentType "application/json" `
->>   -Body '{"sub":"cust_123","email":"customer@example.com","roles":["customer"]}'
+ -Uri http://localhost:9000/token `
+-ContentType "application/json" `
+-Body '{"sub":"cust_123","email":"customer@example.com","roles":["customer"]}'
 
 
 Invoke-RestMethod -Method Post `
@@ -55,15 +55,15 @@ Invoke-RestMethod -Method Post `
 
 
    Invoke-RestMethod -Method Post `
->>   -Uri "http://localhost:8080/v1/customer/payment_methods/tokenize" `
->>   -Headers @{
->>     Authorization = "Bearer $($resp.access_token)"
->>     "X-Publishable-Key" = "pk_test_123"
->>     "X-Merchant-Id" = "m_123"
->>     "X-User-Id" = "u_001"
->>   } `
->>   -ContentType "application/json" `
->>   -Body '{"card_number":"4242424242424242","exp_month":12,"exp_year":2030,"cvc":"123"}'
+  -Uri "http://localhost:8080/v1/customer/payment_methods/tokenize" `
+  -Headers @{
+   Authorization = "Bearer $($resp.access_token)"
+   "X-Publishable-Key" = "pk_test_123"
+   "X-Merchant-Id" = "m_123"
+   "X-User-Id" = "u_001"
+   } `
+  -ContentType "application/json" `
+   -Body '{"card_number":"4242424242424242","exp_month":12,"exp_year":2030,"cvc":"123"}'
 
 
  Invoke-RestMethod -Method Post `
