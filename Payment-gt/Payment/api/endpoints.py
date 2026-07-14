@@ -31,6 +31,11 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
+from fastapi import APIRouter, BackgroundTasks, Depends, Header, HTTPException, Request, status
+from fraud_service.app.services.fraud_client import check_fraud, get_card_fingerprint
+from uuid import uuid4
+
+
 def build_payment_response(payment: Payment) -> dict:
     return {
         "payment_id": payment.id,
@@ -61,11 +66,44 @@ def build_payment_response(payment: Payment) -> dict:
 async def create_payment_intent(
     payload: CreatePaymentRequest,
     background_tasks: BackgroundTasks,
+    request: Request,
     x_merchant_id: str | None = Header(None, alias="X-Merchant-Id"),
     idempotency_key: str | None = Header(None, alias="Idempotency-Key"),
     db: Session = Depends(get_db),
 ):
     merchant_id = x_merchant_id or "m_123"
+    # ── FRAUD CHECK - ADD THIS BLOCK ──────────────────────────────
+    temp_payment_id = f"pi_pending_{uuid4().hex[:8]}"
+    temp_customer_id = f"cust_{uuid4().hex[:8]}"
+
+    fraud_result = await check_fraud(
+        payment_id=temp_payment_id,
+        merchant_id=merchant_id,
+        amount=payload.amount,
+        currency=payload.currency,
+        card=payload.card,
+        customer_id=temp_customer_id,
+        customer_email=payload.customer.email,
+        ip_address=request.headers.get("x-forwarded-for") or request.client.host,
+        user_agent=request.headers.get("user-agent"),
+    )
+
+    if not fraud_result.get("allowed", True):
+        logger.warning(
+            f"Payment blocked by fraud service: "
+            f"score={fraud_result.get('risk_score')} "
+            f"reason={fraud_result.get('block_reason')}"
+        )
+        raise HTTPException(
+            status_code=status.HTTP_402_PAYMENT_REQUIRED,
+            detail={
+                "error": "transaction_blocked",
+                "code": "fraud_detected",
+                "message": fraud_result.get("block_reason", "Transaction blocked by fraud detection"),
+                "risk_score": fraud_result.get("risk_score"),
+            },
+        )
+    # ── END FRAUD CHECK ───────────────────────────────────────────
 
     if idempotency_key:
         existing = (

@@ -7,7 +7,9 @@ CREATE DATABASE auth_db;
 CREATE DATABASE merchant_db;
 CREATE DATABASE customer_db;
 CREATE DATABASE payment_db;
+CREATE DATABASE fraud_db;
 -- Grant permissions
 GRANT ALL PRIVILEGES ON DATABASE gateway_db TO payments;
 GRANT ALL PRIVILEGES ON DATABASE customer_db TO payments;
 GRANT ALL PRIVILEGES ON DATABASE payment_db TO payments;
+GRANT ALL PRIVILEGES ON DATABASE fraud_db TO payments;

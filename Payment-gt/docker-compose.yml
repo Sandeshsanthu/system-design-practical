@@ -8,7 +8,6 @@ services:
     environment:
       POSTGRES_USER: payments
       POSTGRES_PASSWORD: payments
-      # Multiple databases will be created via init script
     ports:
       - "5432:5432"
     volumes:
@@ -50,6 +49,38 @@ services:
       timeout: 3s
       retries: 20
 
+  fraud-service:
+    build:
+      context: .
+      dockerfile: fraud_service/Dockerfile
+    container_name: fraud-service
+    ports:
+      - "8004:8004"
+    environment:
+      - DATABASE_URL=postgresql://payments:payments@postgres:5432/fraud_db
+      - PORT=8004
+      - LOW_RISK_THRESHOLD=30
+      - MEDIUM_RISK_THRESHOLD=70
+      - CARD_VELOCITY_WINDOW_MINUTES=60
+      - CARD_VELOCITY_MAX_ATTEMPTS=5
+      - IP_VELOCITY_WINDOW_MINUTES=60
+      - IP_VELOCITY_MAX_ATTEMPTS=10
+      - CUSTOMER_VELOCITY_WINDOW_HOURS=24
+      - CUSTOMER_VELOCITY_MAX_ATTEMPTS=10
+      - ML_MODEL_ENABLED=true
+      - ML_MODEL_WEIGHT=0.3
+      - RULES_WEIGHT=0.7
+    networks:
+      - payment-net
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8004/health')\""]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
   payment-service:
     build:
       context: .
@@ -59,10 +90,14 @@ services:
       - "8003:8003"
     environment:
       - DATABASE_URL=postgresql://payments:payments@postgres:5432/payment_db
+      - FRAUD_SERVICE_URL=http://fraud-service:8004
+      - PORT=8003
     networks:
       - payment-net
     depends_on:
       postgres:
+        condition: service_healthy
+      fraud-service:
         condition: service_healthy
     healthcheck:
       test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8003/health')\""]
@@ -136,6 +171,8 @@ services:
       redis:
         condition: service_healthy
       auth-service:
+        condition: service_healthy
+      fraud-service:
         condition: service_healthy
       payment-service:
         condition: service_healthy
