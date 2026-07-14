@@ -105,20 +105,25 @@ async def customer(path: str, request: Request):
     pk = request.headers.get("x-publishable-key")
     if not pk:
         raise HTTPException(status_code=401, detail="Missing publishable key")
+
     record = await get_api_key(app.state.db, settings.key_hash_pepper, pk)
     if not record or not record["active"] or record["key_type"] != "publishable":
         raise HTTPException(status_code=401, detail="Invalid publishable key")
+
     origin = request.headers.get("origin")
     if origin:
         if origin not in settings.allowed_origins or (record["allowed_origins"] and origin not in record["allowed_origins"]):
             raise HTTPException(status_code=403, detail="Origin not allowed")
+
     claims = await app.state.jwks.validate_jwt(bearer_token(request.headers.get("authorization")))
     scope = scope_for(request.method, path, CUSTOMER)
     if scope:
-        require_scope(record, scope)
+        require_scope(claims, scope)
+
     limit = settings.public_confirm_rate_limit_per_min if path.strip("/") == "payment_intents/confirm" else settings.public_rate_limit_per_min
     await enforce(app.state.redis, f"customer-ip:{record['key_id']}:{client_ip(request)}", limit)
     await enforce(app.state.redis, f"customer-user:{record['key_id']}:{claims.get('sub')}", limit)
+
     return await proxy(request, settings.customer_service_url, path, {
         "x-merchant-id": record["merchant_id"],
         "x-key-id": record["key_id"],

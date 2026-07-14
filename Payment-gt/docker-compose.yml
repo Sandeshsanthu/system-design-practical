@@ -6,17 +6,18 @@ services:
     image: postgres:16-alpine
     container_name: postgres
     environment:
-      POSTGRES_DB: payments
       POSTGRES_USER: payments
       POSTGRES_PASSWORD: payments
+      # Multiple databases will be created via init script
     ports:
       - "5432:5432"
     volumes:
       - pg_payment_data:/var/lib/postgresql/data
+      - ./init.sql:/docker-entrypoint-initdb.d/init-db.sql
     networks:
       - payment-net
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U payments -d payments"]
+      test: ["CMD-SHELL", "pg_isready -U payments"]
       interval: 5s
       timeout: 3s
       retries: 20
@@ -57,7 +58,7 @@ services:
     ports:
       - "8003:8003"
     environment:
-      - DATABASE_URL=postgresql://payments:payments@postgres:5432/payments
+      - DATABASE_URL=postgresql://payments:payments@postgres:5432/payment_db
     networks:
       - payment-net
     depends_on:
@@ -78,11 +79,17 @@ services:
       - "8001:8001"
     environment:
       - PAYMENT_ENGINE_URL=http://payment-service:8003
+      - PORT=8001
     networks:
       - payment-net
     depends_on:
       payment-service:
         condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8001/health')\""]
+      interval: 5s
+      timeout: 3s
+      retries: 20
 
   customer-service:
     build:
@@ -91,8 +98,24 @@ services:
     container_name: customer-service
     ports:
       - "8002:8002"
+    environment:
+      - DATABASE_URL=postgresql://payments:payments@postgres:5432/customer_db
+      - MERCHANT_SERVICE_URL=http://merchant-service:8001
+      - CHECKOUT_SESSION_TTL_MINUTES=30
+      - PAYMENT_METHOD_TTL_MINUTES=15
+      - PORT=8002
     networks:
       - payment-net
+    depends_on:
+      postgres:
+        condition: service_healthy
+      merchant-service:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8002/health')\""]
+      interval: 5s
+      timeout: 3s
+      retries: 20
 
   gateway:
     build:
@@ -101,6 +124,12 @@ services:
     container_name: api-gateway
     env_file:
       - .env
+    environment:
+      - DATABASE_URL=postgresql://payments:payments@postgres:5432/gateway_db
+      - REDIS_URL=redis://redis:6379/0
+      - MERCHANT_SERVICE_URL=http://merchant-service:8001
+      - CUSTOMER_SERVICE_URL=http://customer-service:8002
+      - AUTH_SERVICE_URL=http://auth-service:9000
     depends_on:
       postgres:
         condition: service_healthy
@@ -111,13 +140,18 @@ services:
       payment-service:
         condition: service_healthy
       merchant-service:
-        condition: service_started
+        condition: service_healthy
       customer-service:
-        condition: service_started
+        condition: service_healthy
     ports:
       - "8080:8080"
     networks:
       - payment-net
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8080/health')\""]
+      interval: 5s
+      timeout: 3s
+      retries: 20
 
 volumes:
   pg_payment_data:

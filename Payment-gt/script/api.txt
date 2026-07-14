@@ -1,78 +1,119 @@
-PS C:\Users\sandeshs> $resp = Invoke-RestMethod -Method Post `
- -Uri http://localhost:9000/token `
--ContentType "application/json" `
--Body '{"sub":"cust_123","email":"customer@example.com","roles":["customer"]}'
+# Configuration
+$API_GATEWAY = "http://localhost:8080"
+$AUTH_SERVICE = "http://localhost:9000"
+$PUBLISHABLE_KEY = "pk_test_123"
 
+# Step 1: Get JWT Token
+Write-Host "`n1. Getting JWT Token..." -ForegroundColor Yellow
+$tokenBody = @{
+    sub = "user_$(Get-Date -Format 'yyyyMMddHHmmss')"
+    email = "test@example.com"
+    roles = @("customer")
+    scopes = @(
+        "payment_session:create",
+        "payment_session:read_own",
+        "payment_method:tokenize",
+        "payment_intent:confirm_own",
+        "public_config:read"
+    )
+} | ConvertTo-Json
 
-Invoke-RestMethod -Method Post `
-  -Uri "http://localhost:8080/v1/merchant/captures" `
-  -Headers @{ Authorization = "Bearer sk_test_123" } `
-  -ContentType "application/json" `
-  -Body '{"payment_id":"pi_26dd9fcb74674ba992"}'
+$tokenResponse = Invoke-RestMethod `
+    -Uri "$AUTH_SERVICE/token" `
+    -Method POST `
+    -Body $tokenBody `
+    -ContentType "application/json"
 
+$JWT_TOKEN = $tokenResponse.access_token
+Write-Host "✓ JWT Token obtained" -ForegroundColor Green
 
-Invoke-RestMethod -Method Post `
-  -Uri "http://localhost:8080/v1/merchant/refunds" `
-  -Headers @{ Authorization = "Bearer sk_test_123" } `
-  -ContentType "application/json" `
-  -Body '{"payment_id":"pi_26dd9fcb74674ba992","amount":500}'
+# Step 2: Create Payment Session
+Write-Host "`n2. Creating Payment Session..." -ForegroundColor Yellow
+$sessionHeaders = @{
+    "Content-Type" = "application/json"
+    "X-Publishable-Key" = $PUBLISHABLE_KEY
+    "Authorization" = "Bearer $JWT_TOKEN"
+}
 
-Invoke-RestMethod -Method Post `
->>   -Uri "http://localhost:8080/v1/merchant/payment_intents" `
->>   -Headers @{ Authorization = "Bearer sk_test_123" } `
->>   -ContentType "application/json" `
->>   -Body '{"amount":1000,"currency":"usd","order_id":"ord_001"}'
+$sessionBody = @{
+    cart_id = "cart_$(Get-Date -Format 'yyyyMMddHHmmss')"
+    order_id = "order_$(Get-Date -Format 'yyyyMMddHHmmss')"
+    amount = 5000
+    currency = "usd"
+    description = "Test Order - PowerShell"
+    metadata = @{
+        test = "true"
+        environment = "development"
+    }
+    capture = $true
+} | ConvertTo-Json
 
+$session = Invoke-RestMethod `
+    -Uri "$API_GATEWAY/v1/customer/payment_sessions" `
+    -Method POST `
+    -Headers $sessionHeaders `
+    -Body $sessionBody
 
-Invoke-RestMethod -Method Get `
-  -Uri "http://localhost:8080/v1/merchant/payments/pi_26dd9fcb74674ba992" `
-  -Headers @{ Authorization = "Bearer sk_test_123" }
+$SESSION_ID = $session.session_id
+Write-Host "✓ Session created: $SESSION_ID" -ForegroundColor Green
 
+# Step 3: Tokenize Card (with 2026 year)
+Write-Host "`n3. Tokenizing Card..." -ForegroundColor Yellow
+$tokenizeHeaders = @{
+    "Content-Type" = "application/json"
+    "X-Publishable-Key" = $PUBLISHABLE_KEY
+    "Authorization" = "Bearer $JWT_TOKEN"
+}
 
-  Invoke-RestMethod -Method Get `
-  -Uri "http://localhost:8080/v1/merchant/balance" `
-  -Headers @{ Authorization = "Bearer sk_test_123" }
+$cardBody = @{
+    card_number = "4242424242424242"
+    exp_month = 12
+    exp_year = 2026  # ✅ Using 2026
+    cvc = "123"
+} | ConvertTo-Json
 
+$token = Invoke-RestMethod `
+    -Uri "$API_GATEWAY/v1/customer/payment_methods/tokenize" `
+    -Method POST `
+    -Headers $tokenizeHeaders `
+    -Body $cardBody
 
-  customer :
+$PAYMENT_METHOD_TOKEN = $token.payment_method_token
+Write-Host "✓ Card tokenized: $PAYMENT_METHOD_TOKEN" -ForegroundColor Green
+Write-Host "  Brand: $($token.brand)" -ForegroundColor Cyan
+Write-Host "  Last4: $($token.last4)" -ForegroundColor Cyan
 
-  $resp = Invoke-RestMethod -Method Post `
->>   -Uri http://localhost:9000/token `
->>   -ContentType "application/json" `
->>   -Body '{"sub":"cust_123","email":"customer@example.com","roles":["customer"]}'
+# Step 4: Confirm Payment
+Write-Host "`n4. Confirming Payment..." -ForegroundColor Yellow
+$confirmHeaders = @{
+    "Content-Type" = "application/json"
+    "X-Publishable-Key" = $PUBLISHABLE_KEY
+    "Authorization" = "Bearer $JWT_TOKEN"
+}
 
+$confirmBody = @{
+    session_id = $SESSION_ID
+    payment_method_token = $PAYMENT_METHOD_TOKEN
+} | ConvertTo-Json
 
-Invoke-RestMethod -Method Post `
-  -Uri "http://localhost:8080/v1/customer/payment_sessions" `
-  -Headers @{
-    Authorization = "Bearer $($resp.access_token)"
-    "X-Publishable-Key" = "pk_test_123"
-    "X-Merchant-Id" = "m_123"
-    "X-User-Id" = "u_001"
-  } `
-  -ContentType "application/json" `
-  -Body '{"cart_id":"cart_001","amount":1000,"currency":"usd"}'
+$payment = Invoke-RestMethod `
+    -Uri "$API_GATEWAY/v1/customer/payment_intents/confirm" `
+    -Method POST `
+    -Headers $confirmHeaders `
+    -Body $confirmBody
 
-
-   Invoke-RestMethod -Method Post `
-  -Uri "http://localhost:8080/v1/customer/payment_methods/tokenize" `
-  -Headers @{
-   Authorization = "Bearer $($resp.access_token)"
-   "X-Publishable-Key" = "pk_test_123"
-   "X-Merchant-Id" = "m_123"
-   "X-User-Id" = "u_001"
-   } `
-  -ContentType "application/json" `
-   -Body '{"card_number":"4242424242424242","exp_month":12,"exp_year":2030,"cvc":"123"}'
-
-
- Invoke-RestMethod -Method Post `
->>   -Uri "http://localhost:8080/v1/customer/payment_intents/confirm" `
->>   -Headers @{
->>     Authorization = "Bearer $($resp.access_token)"
->>     "X-Publishable-Key" = "pk_test_123"
->>     "X-Merchant-Id" = "m_123"
->>     "X-User-Id" = "u_001"
->>   } `
->>   -ContentType "application/json" `
->>   -Body '{"payment_id":"pi_001","payment_method_token":"pm_001"}'
+# Display Results
+Write-Host "`n" -NoNewline
+Write-Host ("=" * 60) -ForegroundColor Green
+Write-Host "✓ PAYMENT SUCCESSFUL!" -ForegroundColor Green
+Write-Host ("=" * 60) -ForegroundColor Green
+Write-Host "`nPayment Details:" -ForegroundColor Cyan
+Write-Host "  Payment ID: $($payment.payment.payment_id)" -ForegroundColor White
+Write-Host "  Status: $($payment.payment.status)" -ForegroundColor White
+Write-Host "  Amount: $($payment.payment.amount / 100) $($payment.payment.currency.ToUpper())" -ForegroundColor White
+Write-Host "  Auth Code: $($payment.payment.authorization_code)" -ForegroundColor White
+Write-Host "  Card: $($payment.payment.card_brand) **** $($payment.payment.card_last4)" -ForegroundColor White
+Write-Host "`nSession Details:" -ForegroundColor Cyan
+Write-Host "  Session ID: $($payment.session.session_id)" -ForegroundColor White
+Write-Host "  Session Status: $($payment.session.status)" -ForegroundColor White
+Write-Host "  Confirmed At: $($payment.session.confirmed_at)" -ForegroundColor White

@@ -1,32 +1,209 @@
-$createBody = @{
-  amount = 1000
-  currency = "usd"
-  customer = @{
-    email = "test@example.com"
-    name = "Test User"
-    phone = "9999999999"
-  }
-  card = @{
-    number = "4242424242424242"
-    exp_month = 12
-    exp_year = 2028
-    cvc = "123"
-  }
-  order_id = "ord_e2e_001"
-  description = "End to end test payment"
-  metadata = @{
-    source = "gateway-e2e"
-    suite = "full-flow"
-  }
-  capture = $false
-} | ConvertTo-Json -Depth 5
+# ============================================================================
+# MERCHANT DIRECT INTEGRATION - COMPLETE FLOW
+# ============================================================================
 
-$createResponse = Invoke-RestMethod -Method Post `
-  -Uri "http://localhost:8080/v1/merchant/payment_intents" `
-  -Headers @{ Authorization = "Bearer sk_test_123" } `
-  -ContentType "application/json" `
-  -Body $createBody
+$API_GATEWAY = "http://localhost:8080"
+$SECRET_KEY = "sk_test_123"
 
-$createResponse
-$paymentId = $createResponse.payment_id
-$paymentId
+Write-Host "`n" -NoNewline
+Write-Host ("=" * 70) -ForegroundColor Cyan
+Write-Host "MERCHANT DIRECT PAYMENT FLOW" -ForegroundColor Cyan
+Write-Host ("=" * 70) -ForegroundColor Cyan
+
+# ============================================================================
+# STEP 1: Create Payment Intent (Authorization)
+# ============================================================================
+Write-Host "`n[1] Creating Payment Intent (Authorization)..." -ForegroundColor Yellow
+
+$merchantHeaders = @{
+    "Content-Type" = "application/json"
+    "Authorization" = "Bearer $SECRET_KEY"
+    "Idempotency-Key" = "order_$(Get-Date -Format 'yyyyMMddHHmmss')"
+}
+
+$merchantBody = @{
+    amount = 15000
+    currency = "usd"
+    customer = @{
+        email = "customer@example.com"
+        name = "John Doe"
+        phone = "+1234567890"
+    }
+    card = @{
+        number = "4242424242424242"
+        exp_month = 12
+        exp_year = 2026  # ✅ Using 2026
+        cvc = "123"
+    }
+    order_id = "order_merchant_$(Get-Date -Format 'yyyyMMddHHmmss')"
+    description = "Enterprise Subscription - Annual"
+    metadata = @{
+        customer_id = "cust_existing_12345"
+        plan = "enterprise_annual"
+        seats = 10
+        billing_cycle = "annual"
+    }
+    capture = $false
+} | ConvertTo-Json
+
+try {
+    $merchantPayment = Invoke-RestMethod `
+        -Uri "$API_GATEWAY/v1/merchant/payment_intents" `
+        -Method POST `
+        -Headers $merchantHeaders `
+        -Body $merchantBody
+
+    $MERCHANT_PAYMENT_ID = $merchantPayment.payment_id
+    
+    Write-Host "`n✓ Payment Authorized Successfully!" -ForegroundColor Green
+    Write-Host "  Payment ID: $MERCHANT_PAYMENT_ID" -ForegroundColor White
+    Write-Host "  Status: $($merchantPayment.status)" -ForegroundColor White
+    Write-Host "  Auth Code: $($merchantPayment.authorization_code)" -ForegroundColor White
+    Write-Host "  Amount: `$$($merchantPayment.amount / 100) $($merchantPayment.currency.ToUpper())" -ForegroundColor White
+    Write-Host "  Customer: $($merchantPayment.customer_email)" -ForegroundColor White
+    Write-Host "  Card: $($merchantPayment.card_brand) **** $($merchantPayment.card_last4)" -ForegroundColor White
+    Write-Host "  Created: $($merchantPayment.created_at)" -ForegroundColor White
+}
+catch {
+    Write-Host "`n✗ Payment Failed!" -ForegroundColor Red
+    $errorResponse = $_.ErrorDetails.Message | ConvertFrom-Json
+    Write-Host "Error: $($errorResponse.detail)" -ForegroundColor Red
+    exit 1
+}
+
+# Wait a moment before capture
+Start-Sleep -Seconds 2
+
+# ============================================================================
+# STEP 2: Retrieve Payment Details
+# ============================================================================
+Write-Host "`n[2] Retrieving Payment Details..." -ForegroundColor Yellow
+
+$getPaymentHeaders = @{
+    "Authorization" = "Bearer $SECRET_KEY"
+}
+
+try {
+    $paymentDetails = Invoke-RestMethod `
+        -Uri "$API_GATEWAY/v1/merchant/payments/$MERCHANT_PAYMENT_ID" `
+        -Method GET `
+        -Headers $getPaymentHeaders
+
+    Write-Host "`n✓ Payment Details Retrieved" -ForegroundColor Green
+    Write-Host "  Payment ID: $($paymentDetails.payment_id)" -ForegroundColor White
+    Write-Host "  Status: $($paymentDetails.status)" -ForegroundColor White
+    Write-Host "  Amount: `$$($paymentDetails.amount / 100)" -ForegroundColor White
+    Write-Host "  Captured: `$$($paymentDetails.amount_captured / 100)" -ForegroundColor White
+    Write-Host "  Refunded: `$$($paymentDetails.amount_refunded / 100)" -ForegroundColor White
+}
+catch {
+    Write-Host "✗ Failed to retrieve payment" -ForegroundColor Red
+}
+
+# ============================================================================
+# STEP 3: Capture Payment (Full Amount)
+# ============================================================================
+Write-Host "`n[3] Capturing Payment..." -ForegroundColor Yellow
+
+$captureHeaders = @{
+    "Content-Type" = "application/json"
+    "Authorization" = "Bearer $SECRET_KEY"
+}
+
+$captureBody = @{
+    payment_id = $MERCHANT_PAYMENT_ID
+    amount = $null  # null = capture full authorized amount
+} | ConvertTo-Json
+
+try {
+    $capture = Invoke-RestMethod `
+        -Uri "$API_GATEWAY/v1/merchant/captures" `
+        -Method POST `
+        -Headers $captureHeaders `
+        -Body $captureBody
+
+    Write-Host "`n✓ Payment Captured Successfully!" -ForegroundColor Green
+    Write-Host "  Payment ID: $($capture.payment_id)" -ForegroundColor White
+    Write-Host "  Status: $($capture.status)" -ForegroundColor White
+    Write-Host "  Captured Amount: `$$($capture.captured_amount / 100)" -ForegroundColor White
+    Write-Host "  Capture Reference: $($capture.capture_reference)" -ForegroundColor White
+}
+catch {
+    Write-Host "`n✗ Capture Failed!" -ForegroundColor Red
+    $errorResponse = $_.ErrorDetails.Message | ConvertFrom-Json
+    Write-Host "Error: $($errorResponse.detail)" -ForegroundColor Red
+    exit 1
+}
+
+# Wait before refund
+Start-Sleep -Seconds 2
+
+# ============================================================================
+# STEP 4: Partial Refund
+# ============================================================================
+Write-Host "`n[4] Processing Partial Refund..." -ForegroundColor Yellow
+
+$refundHeaders = @{
+    "Content-Type" = "application/json"
+    "Authorization" = "Bearer $SECRET_KEY"
+}
+
+$refundBody = @{
+    payment_id = $MERCHANT_PAYMENT_ID
+    amount = 5000  # Refund $50.00 of $150.00
+    reason = "Customer returned 1 item"
+    metadata = @{
+        refund_type = "partial"
+        items_returned = @("item_1")
+    }
+} | ConvertTo-Json
+
+try {
+    $refund = Invoke-RestMethod `
+        -Uri "$API_GATEWAY/v1/merchant/refunds" `
+        -Method POST `
+        -Headers $refundHeaders `
+        -Body $refundBody
+
+    Write-Host "`n✓ Partial Refund Processed!" -ForegroundColor Green
+    Write-Host "  Refund ID: $($refund.id)" -ForegroundColor White
+    Write-Host "  Payment ID: $($refund.payment_id)" -ForegroundColor White
+    Write-Host "  Amount: `$$($refund.amount / 100)" -ForegroundColor White
+    Write-Host "  Status: $($refund.status)" -ForegroundColor White
+    Write-Host "  Reason: $($refund.reason)" -ForegroundColor White
+}
+catch {
+    Write-Host "`n✗ Refund Failed!" -ForegroundColor Red
+    $errorResponse = $_.ErrorDetails.Message | ConvertFrom-Json
+    Write-Host "Error: $($errorResponse.detail)" -ForegroundColor Red
+}
+
+# ============================================================================
+# STEP 5: Retrieve Final Payment State
+# ============================================================================
+Write-Host "`n[5] Retrieving Final Payment State..." -ForegroundColor Yellow
+
+try {
+    $finalState = Invoke-RestMethod `
+        -Uri "$API_GATEWAY/v1/merchant/payments/$MERCHANT_PAYMENT_ID" `
+        -Method GET `
+        -Headers $getPaymentHeaders
+
+    Write-Host "`n" -NoNewline
+    Write-Host ("=" * 70) -ForegroundColor Green
+    Write-Host "FINAL PAYMENT STATE" -ForegroundColor Green
+    Write-Host ("=" * 70) -ForegroundColor Green
+    Write-Host "  Payment ID: $($finalState.payment_id)" -ForegroundColor White
+    Write-Host "  Status: $($finalState.status)" -ForegroundColor White
+    Write-Host "  Original Amount: `$$($finalState.amount / 100)" -ForegroundColor White
+    Write-Host "  Captured Amount: `$$($finalState.amount_captured / 100)" -ForegroundColor White
+    Write-Host "  Refunded Amount: `$$($finalState.amount_refunded / 100)" -ForegroundColor White
+    Write-Host "  Net Amount: `$$(($finalState.amount_captured - $finalState.amount_refunded) / 100)" -ForegroundColor Cyan
+    Write-Host ("=" * 70) -ForegroundColor Green
+}
+catch {
+    Write-Host "✗ Failed to retrieve final state" -ForegroundColor Red
+}
+
+Write-Host "`n✓ Merchant Flow Complete!" -ForegroundColor Green
+Write-Host ""

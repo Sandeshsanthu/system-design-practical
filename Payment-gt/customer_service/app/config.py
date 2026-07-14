@@ -6,14 +6,19 @@ import os
 
 class Settings:
     service_name: str = os.getenv("SERVICE_NAME", "customer-service")
+
+    # Use PostgreSQL, not SQLite
     database_url: str = os.getenv(
         "DATABASE_URL",
-        "sqlite:///./customer_service.db",
+        "postgresql://payments:payments@postgres:5432/customer_db",
     )
-    payment_service_url: str = os.getenv(
-        "PAYMENT_SERVICE_URL",
-        "http://payment-service:8003/api/v1",
+
+    # ✅ FIXED: Point to Merchant Service instead of Payment Service
+    merchant_service_url: str = os.getenv(
+        "MERCHANT_SERVICE_URL",
+        "http://merchant-service:8001",
     ).rstrip("/")
+
     checkout_session_ttl_minutes: int = int(
         os.getenv("CHECKOUT_SESSION_TTL_MINUTES", "30")
     )
