@@ -1,0 +1,11 @@
+# filename: bank_connector/requirements.txt
+
+fastapi==0.115.0
+uvicorn==0.30.6
+sqlalchemy==2.0.35
+psycopg2-binary==2.9.9
+pydantic==2.9.2
+stripe==11.1.0
+httpx==0.27.2
+tenacity==9.0.0
+python-multipart==0.0.12

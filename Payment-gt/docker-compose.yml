@@ -81,6 +81,40 @@ services:
       timeout: 3s
       retries: 20
 
+  bank-connector:
+    build:
+      context: .
+      dockerfile: bank_connector/Dockerfile
+    container_name: bank-connector
+    ports:
+      - "8006:8005"
+    environment:
+      - DATABASE_URL=postgresql://payments:payments@postgres:5432/bank_connector_db
+      - PORT=8005
+      # ── Stripe Keys ──────────────────────────────────────────────
+      # Get from: https://dashboard.stripe.com/test/apikeys
+      - STRIPE_SECRET_KEY=${STRIPE_SECRET_KEY:-sk_test_placeholder}
+      - STRIPE_WEBHOOK_SECRET=${STRIPE_WEBHOOK_SECRET:-whsec_placeholder}
+      - STRIPE_API_VERSION=2024-06-20
+      # ── Retry Config ─────────────────────────────────────────────
+      - MAX_RETRIES=3
+      - RETRY_WAIT_SECONDS=1.0
+      - RETRY_MAX_WAIT_SECONDS=10.0
+      # ── Circuit Breaker ──────────────────────────────────────────
+      - CB_FAILURE_THRESHOLD=5
+      - CB_TIMEOUT_SECONDS=60
+      - STRIPE_TIMEOUT_SECONDS=30
+    networks:
+      - payment-net
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8005/health')\""]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
   payment-service:
     build:
       context: .
@@ -91,6 +125,7 @@ services:
     environment:
       - DATABASE_URL=postgresql://payments:payments@postgres:5432/payment_db
       - FRAUD_SERVICE_URL=http://fraud-service:8004
+      - BANK_CONNECTOR_URL=http://bank-connector:8005
       - PORT=8003
     networks:
       - payment-net
@@ -98,6 +133,8 @@ services:
       postgres:
         condition: service_healthy
       fraud-service:
+        condition: service_healthy
+      bank-connector:
         condition: service_healthy
     healthcheck:
       test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8003/health')\""]
@@ -173,6 +210,8 @@ services:
       auth-service:
         condition: service_healthy
       fraud-service:
+        condition: service_healthy
+      bank-connector:
         condition: service_healthy
       payment-service:
         condition: service_healthy
