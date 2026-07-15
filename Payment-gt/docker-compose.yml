@@ -219,12 +219,40 @@ services:
         condition: service_healthy
       customer-service:
         condition: service_healthy
+      ledger-service:                                   
+        condition: service_healthy
     ports:
       - "8080:8080"
     networks:
       - payment-net
     healthcheck:
       test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8080/health')\""]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  ledger-service:
+    build:
+      context: .
+      dockerfile: ledger_service/Dockerfile
+    container_name: ledger-service
+    ports:
+      - "8007:8007"
+    environment:
+      - DATABASE_URL=postgresql://payments:payments@postgres:5432/ledger_db
+      - PORT=8007
+      - PLATFORM_FEE_PERCENT=2.5
+      - PLATFORM_ACCOUNT_ID=acc_platform
+      - ESCROW_ACCOUNT_ID=acc_escrow
+      - FEE_ACCOUNT_ID=acc_fees
+      - REFUND_RESERVE_ACCOUNT_ID=acc_refund_reserve
+    networks:
+      - payment-net
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8007/health')\""]
       interval: 5s
       timeout: 3s
       retries: 20
