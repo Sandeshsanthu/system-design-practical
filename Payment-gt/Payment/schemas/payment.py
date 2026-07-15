@@ -19,12 +19,10 @@ class CardInfo(BaseModel):
         v = v.replace(" ", "").replace("-", "")
         if not v.isdigit():
             raise ValueError("Card number must contain only digits")
-
         digits = [int(d) for d in v]
         checksum = sum(digits[-1::-2])
         for d in digits[-2::-2]:
             checksum += sum(int(x) for x in str(d * 2))
-
         if checksum % 10 != 0:
             raise ValueError("Invalid card number")
         return v
@@ -38,6 +36,7 @@ class CardInfo(BaseModel):
 
 
 class CustomerInfo(BaseModel):
+    id: Optional[str] = None          # ← ADDED: was missing, caused crash on payload.customer.id
     email: EmailStr
     name: str
     phone: Optional[str] = None

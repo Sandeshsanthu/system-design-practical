@@ -2,6 +2,7 @@
 # filename: docker-compose.yml
 
 services:
+
   postgres:
     image: postgres:16-alpine
     container_name: postgres
@@ -91,16 +92,12 @@ services:
     environment:
       - DATABASE_URL=postgresql://payments:payments@postgres:5432/bank_connector_db
       - PORT=8005
-      # ── Stripe Keys ──────────────────────────────────────────────
-      # Get from: https://dashboard.stripe.com/test/apikeys
       - STRIPE_SECRET_KEY=${STRIPE_SECRET_KEY:-sk_test_placeholder}
       - STRIPE_WEBHOOK_SECRET=${STRIPE_WEBHOOK_SECRET:-whsec_placeholder}
       - STRIPE_API_VERSION=2024-06-20
-      # ── Retry Config ─────────────────────────────────────────────
       - MAX_RETRIES=3
       - RETRY_WAIT_SECONDS=1.0
       - RETRY_MAX_WAIT_SECONDS=10.0
-      # ── Circuit Breaker ──────────────────────────────────────────
       - CB_FAILURE_THRESHOLD=5
       - CB_TIMEOUT_SECONDS=60
       - STRIPE_TIMEOUT_SECONDS=30
@@ -115,6 +112,65 @@ services:
       timeout: 3s
       retries: 20
 
+  ledger-service:
+    build:
+      context: .
+      dockerfile: ledger_service/Dockerfile
+    container_name: ledger-service
+    ports:
+      - "8007:8007"
+    environment:
+      - DATABASE_URL=postgresql://payments:payments@postgres:5432/ledger_db
+      - PORT=8007
+      - PLATFORM_FEE_PERCENT=2.5
+      - PLATFORM_ACCOUNT_ID=acc_platform
+      - ESCROW_ACCOUNT_ID=acc_escrow
+      - FEE_ACCOUNT_ID=acc_fees
+      - REFUND_RESERVE_ACCOUNT_ID=acc_refund_reserve
+    networks:
+      - payment-net
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8007/health')\""]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  # ── CHANGE 1: new service ──────────────────────────────────────────────────
+  notification-service:
+    build:
+      context: .
+      dockerfile: notification-service/Dockerfile
+    container_name: notification-service
+    ports:
+      - "8008:8008"
+    environment:
+      - DATABASE_URL=postgresql://payments:payments@postgres:5432/notification_db
+      - PORT=8008
+      - MOCK_EMAIL=true
+      - MOCK_SMS=true
+      - WEBHOOK_SIGNING_SECRET=whsec_dev_secret_32_chars_minimum_x
+      - WEBHOOK_TIMEOUT_SECONDS=10
+      - WEBHOOK_MAX_RETRIES=3
+      # Production — inject via .env or secrets manager, never hardcode:
+      # - SENDGRID_API_KEY=sg_live_...
+      # - TWILIO_ACCOUNT_SID=AC...
+      # - TWILIO_AUTH_TOKEN=...
+      # - TWILIO_FROM_NUMBER=+1...
+    networks:
+      - payment-net
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8008/health')\""]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    restart: unless-stopped
+
   payment-service:
     build:
       context: .
@@ -126,6 +182,8 @@ services:
       - DATABASE_URL=postgresql://payments:payments@postgres:5432/payment_db
       - FRAUD_SERVICE_URL=http://fraud-service:8004
       - BANK_CONNECTOR_URL=http://bank-connector:8005
+      - LEDGER_SERVICE_URL=http://ledger-service:8007
+      - NOTIFICATION_SERVICE_URL=http://notification-service:8008   # ── CHANGE 2
       - PORT=8003
     networks:
       - payment-net
@@ -135,6 +193,10 @@ services:
       fraud-service:
         condition: service_healthy
       bank-connector:
+        condition: service_healthy
+      ledger-service:
+        condition: service_healthy
+      notification-service:                                          # ── CHANGE 2
         condition: service_healthy
     healthcheck:
       test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8003/health')\""]
@@ -202,6 +264,10 @@ services:
       - MERCHANT_SERVICE_URL=http://merchant-service:8001
       - CUSTOMER_SERVICE_URL=http://customer-service:8002
       - AUTH_SERVICE_URL=http://auth-service:9000
+    ports:
+      - "8080:8080"
+    networks:
+      - payment-net
     depends_on:
       postgres:
         condition: service_healthy
@@ -219,40 +285,12 @@ services:
         condition: service_healthy
       customer-service:
         condition: service_healthy
-      ledger-service:                                   
+      ledger-service:
         condition: service_healthy
-    ports:
-      - "8080:8080"
-    networks:
-      - payment-net
+      notification-service:                                          # ── CHANGE 3
+        condition: service_healthy
     healthcheck:
       test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8080/health')\""]
-      interval: 5s
-      timeout: 3s
-      retries: 20
-
-  ledger-service:
-    build:
-      context: .
-      dockerfile: ledger_service/Dockerfile
-    container_name: ledger-service
-    ports:
-      - "8007:8007"
-    environment:
-      - DATABASE_URL=postgresql://payments:payments@postgres:5432/ledger_db
-      - PORT=8007
-      - PLATFORM_FEE_PERCENT=2.5
-      - PLATFORM_ACCOUNT_ID=acc_platform
-      - ESCROW_ACCOUNT_ID=acc_escrow
-      - FEE_ACCOUNT_ID=acc_fees
-      - REFUND_RESERVE_ACCOUNT_ID=acc_refund_reserve
-    networks:
-      - payment-net
-    depends_on:
-      postgres:
-        condition: service_healthy
-    healthcheck:
-      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8007/health')\""]
       interval: 5s
       timeout: 3s
       retries: 20

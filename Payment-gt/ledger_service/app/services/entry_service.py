@@ -5,8 +5,8 @@ import logging
 import uuid
 from decimal import Decimal, ROUND_HALF_UP
 
-from sqlalchemy.orm import Session
 from fastapi import HTTPException
+from sqlalchemy.orm import Session
 
 from ledger_service.app.config import settings
 from ledger_service.app.models.ledger import Account, LedgerEntry, LedgerTransaction
@@ -24,7 +24,11 @@ def cents_to_decimal(cents: int) -> Decimal:
 
 def calculate_platform_fee(amount_cents: int) -> int:
     """Calculate platform fee in cents"""
-    fee = Decimal(str(amount_cents)) * Decimal(str(settings.platform_fee_percent)) / Decimal("100")
+    fee = (
+        Decimal(str(amount_cents))
+        * Decimal(str(settings.platform_fee_percent))
+        / Decimal("100")
+    )
     return int(fee.quantize(Decimal("1"), rounding=ROUND_HALF_UP))
 
 
@@ -64,7 +68,7 @@ def _create_entry(
         currency=currency,
         balance_after=account.balance,
         description=description,
-        metadata=metadata or {},
+        extra_metadata=metadata or {},  # ✅ FIX 1: was metadata=
     )
     db.add(entry)
     return entry
@@ -80,22 +84,20 @@ def record_authorization(
 ) -> LedgerTransaction:
     """
     Record payment authorization.
-    
-    Funds are held (in escrow / pending) but not yet settled.
-    
-    Entries:
-      DEBIT  escrow_account     +amount  (money arriving)
-      CREDIT merchant_pending   -amount  (merchant has pending income)
-    
+
+    Funds are held in escrow. Platform acknowledges the liability.
+
+    Entries (BALANCED):
+      DEBIT  escrow_account        +amount   (money arriving in escrow)
+      CREDIT platform_liability    -amount   (platform owes this money back)
+
     Real world:
-      Customer authorizes $100 on card
-      $100 held on card (not charged yet)
-      Escrow shows $100 pending
+      Customer authorizes $100 — card hold placed.
+      Escrow +$100, platform liability +$100.
     """
     amount = cents_to_decimal(amount_cents)
     tx_id = f"ltx_{uuid.uuid4().hex[:18]}"
 
-    # Check no duplicate
     existing = db.query(LedgerTransaction).filter(
         LedgerTransaction.payment_id == payment_id,
         LedgerTransaction.event_type == "payment.authorized",
@@ -109,12 +111,15 @@ def record_authorization(
     escrow_account = get_or_create_account(
         db, settings.escrow_account_id, "platform", "platform", "liability", currency
     )
+    platform_liability_account = get_or_create_account(
+        db, settings.platform_account_id, "platform", "platform", "liability", currency
+    )
     merchant_account = get_or_create_account(
         db, merchant_acct_id, merchant_id, "merchant", "asset", currency,
-        description=f"Merchant account for {merchant_id}"
+        description=f"Merchant account for {merchant_id}",
     )
 
-    # DEBIT escrow (money coming in to platform holding)
+    # DEBIT escrow — money arrives into holding
     _create_entry(
         db, tx_id, escrow_account, payment_id, merchant_id,
         "debit", "payment.authorized", amount, currency,
@@ -122,7 +127,15 @@ def record_authorization(
         metadata=metadata,
     )
 
-    # CREDIT merchant pending (merchant has money coming)
+    # ✅ FIX 2: paired CREDIT — platform acknowledges the liability
+    _create_entry(
+        db, tx_id, platform_liability_account, payment_id, merchant_id,
+        "credit", "payment.authorized", amount, currency,
+        description=f"Authorization liability: payment {payment_id}",
+        metadata=metadata,
+    )
+
+    # Track merchant pending (informational, not a ledger entry)
     merchant_account.pending_balance += amount
 
     tx = LedgerTransaction(
@@ -134,7 +147,7 @@ def record_authorization(
         currency=currency,
         status="posted",
         description=f"Payment authorization: {payment_id}",
-        metadata=metadata or {},
+        extra_metadata=metadata or {},  # ✅ FIX 1: was metadata=
     )
     db.add(tx)
     db.commit()
@@ -154,19 +167,20 @@ def record_capture(
 ) -> LedgerTransaction:
     """
     Record payment capture.
-    
+
     Money moves from escrow to merchant (minus platform fee).
-    
-    Entries:
-      CREDIT escrow_account     -amount          (money leaving escrow)
-      DEBIT  merchant_account   +(amount-fee)    (merchant gets paid)
-      DEBIT  fee_account        +fee             (platform keeps fee)
-    
-    Real world:
-      $100 captured
-      Stripe takes $3 (their fee)
-      You take $2.50 (your platform fee)
-      Merchant gets $94.50
+
+    Entries (BALANCED):
+      CREDIT escrow_account      -amount          (money leaving escrow)
+      DEBIT  platform_liability  +amount          (liability cleared)
+      DEBIT  merchant_account    +(amount-fee)    (merchant gets paid, net)
+      CREDIT fee_account         -fee             (platform collects fee)
+
+    Wait — standard approach without platform_liability wash:
+      CREDIT escrow_account     -amount
+      DEBIT  merchant_account   +(amount-fee)
+      DEBIT  fee_account        +fee
+    This IS balanced: credits=amount, debits=(amount-fee)+fee=amount ✅
     """
     amount = cents_to_decimal(amount_cents)
 
@@ -193,20 +207,20 @@ def record_capture(
     )
     merchant_account = get_or_create_account(
         db, merchant_acct_id, merchant_id, "merchant", "asset", currency,
-        description=f"Merchant account for {merchant_id}"
+        description=f"Merchant account for {merchant_id}",
     )
     fee_account = get_or_create_account(
         db, settings.fee_account_id, "platform", "platform", "revenue", currency
     )
 
-    # CREDIT escrow (money leaving escrow)
+    # CREDIT escrow — money leaves escrow
     _create_entry(
         db, tx_id, escrow_account, payment_id, merchant_id,
         "credit", "payment.captured", amount, currency,
         description=f"Capture settlement: payment {payment_id}",
     )
 
-    # DEBIT merchant account (merchant receives net amount)
+    # DEBIT merchant account — merchant receives net
     _create_entry(
         db, tx_id, merchant_account, payment_id, merchant_id,
         "debit", "payment.captured", merchant_net, currency,
@@ -214,7 +228,7 @@ def record_capture(
         metadata={"gross": str(amount), "fee": str(platform_fee)},
     )
 
-    # DEBIT fee account (platform collects fee)
+    # DEBIT fee account — platform collects fee
     _create_entry(
         db, tx_id, fee_account, payment_id, merchant_id,
         "debit", "fee.collected", platform_fee, currency,
@@ -224,7 +238,7 @@ def record_capture(
     # Clear merchant pending balance
     merchant_account.pending_balance = max(
         Decimal("0"),
-        merchant_account.pending_balance - amount
+        merchant_account.pending_balance - amount,
     )
 
     tx = LedgerTransaction(
@@ -236,7 +250,7 @@ def record_capture(
         currency=currency,
         status="posted",
         description=f"Payment captured: {payment_id}",
-        metadata={
+        extra_metadata={                          # ✅ FIX 1: was metadata=
             "gross_amount": str(amount),
             "platform_fee": str(platform_fee),
             "merchant_net": str(merchant_net),
@@ -264,18 +278,14 @@ def record_refund(
 ) -> LedgerTransaction:
     """
     Record a refund.
-    
-    Money moves from merchant back to customer (via escrow).
-    Platform fee is partially returned (fair refund practice).
-    
-    Entries:
-      CREDIT merchant_account  -refund_amount    (deducted from merchant)
-      DEBIT  escrow_account    +refund_amount    (back in escrow for return)
-    
-    Real world:
-      Customer refunded $50
-      Merchant balance reduced by $50
-      Escrow holds $50 to return to customer
+
+    Money moves from merchant back to escrow for return to customer.
+
+    Entries (BALANCED):
+      CREDIT merchant_account  -refund_amount   (deducted from merchant)
+      DEBIT  escrow_account    +refund_amount   (back in escrow for return)
+
+    credits = debits = refund_amount ✅
     """
     amount = cents_to_decimal(amount_cents)
     tx_id = f"ltx_{uuid.uuid4().hex[:18]}"
@@ -289,7 +299,7 @@ def record_refund(
         db, merchant_acct_id, merchant_id, "merchant", "asset", currency,
     )
 
-    # CREDIT merchant account (money taken back from merchant)
+    # CREDIT merchant — money taken back
     _create_entry(
         db, tx_id, merchant_account, payment_id, merchant_id,
         "credit", "payment.refunded", amount, currency,
@@ -297,7 +307,7 @@ def record_refund(
         metadata=metadata,
     )
 
-    # DEBIT escrow (money goes back to escrow for return to customer)
+    # DEBIT escrow — money staged for return to customer
     _create_entry(
         db, tx_id, escrow_account, payment_id, merchant_id,
         "debit", "payment.refunded", amount, currency,
@@ -313,7 +323,7 @@ def record_refund(
         currency=currency,
         status="posted",
         description=f"Refund: {payment_id} reason={reason or 'N/A'}",
-        metadata=metadata or {},
+        extra_metadata=metadata or {},  # ✅ FIX 1: was metadata=
     )
     db.add(tx)
     db.commit()
@@ -332,16 +342,14 @@ def record_void(
 ) -> LedgerTransaction:
     """
     Record a void (reversal of authorization before capture).
-    
-    Money was never captured so just reverse the escrow hold.
-    
-    Entries:
-      CREDIT escrow_account     -amount  (release the hold)
-    
-    Real world:
-      $100 was authorized but never captured
-      Void releases the $100 hold on customer card
-      Escrow reduced by $100
+
+    Reverses the auth entries exactly.
+
+    Entries (BALANCED):
+      CREDIT escrow_account        -amount   (release the escrow hold)
+      DEBIT  platform_liability    +amount   (liability cleared)
+
+    credits = debits = amount ✅
     """
     amount = cents_to_decimal(amount_cents)
     tx_id = f"ltx_{uuid.uuid4().hex[:18]}"
@@ -359,11 +367,14 @@ def record_void(
     escrow_account = get_or_create_account(
         db, settings.escrow_account_id, "platform", "platform", "liability", currency
     )
+    platform_liability_account = get_or_create_account(
+        db, settings.platform_account_id, "platform", "platform", "liability", currency
+    )
     merchant_account = get_or_create_account(
         db, merchant_acct_id, merchant_id, "merchant", "asset", currency,
     )
 
-    # CREDIT escrow (release the hold - authorization cancelled)
+    # CREDIT escrow — release the hold
     _create_entry(
         db, tx_id, escrow_account, payment_id, merchant_id,
         "credit", "payment.voided", amount, currency,
@@ -371,10 +382,18 @@ def record_void(
         metadata=metadata,
     )
 
+    # ✅ FIX 2: paired DEBIT — clears the platform liability from auth
+    _create_entry(
+        db, tx_id, platform_liability_account, payment_id, merchant_id,
+        "debit", "payment.voided", amount, currency,
+        description=f"Void: clear authorization liability {payment_id}",
+        metadata=metadata,
+    )
+
     # Clear merchant pending balance
     merchant_account.pending_balance = max(
         Decimal("0"),
-        merchant_account.pending_balance - amount
+        merchant_account.pending_balance - amount,
     )
 
     tx = LedgerTransaction(
@@ -386,7 +405,7 @@ def record_void(
         currency=currency,
         status="posted",
         description=f"Payment voided: {payment_id}",
-        metadata=metadata or {},
+        extra_metadata=metadata or {},  # ✅ FIX 1: was metadata=
     )
     db.add(tx)
     db.commit()

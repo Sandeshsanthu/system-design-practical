@@ -74,10 +74,6 @@ async def record_authorization_event(
     req: RecordAuthorizationRequest,
     db: Session = Depends(get_db),
 ):
-    """
-    Record payment authorization.
-    Call this when payment is authorized (funds held on card).
-    """
     try:
         tx = record_authorization(
             db,
@@ -105,11 +101,6 @@ async def record_capture_event(
     req: RecordCaptureRequest,
     db: Session = Depends(get_db),
 ):
-    """
-    Record payment capture.
-    Call this when funds are captured (charged to customer).
-    Platform fee is automatically deducted.
-    """
     try:
         tx = record_capture(
             db,
@@ -120,13 +111,15 @@ async def record_capture_event(
             platform_fee_cents=req.platform_fee,
             metadata=req.metadata,
         )
+        # ✅ FIX 1: was tx.metadata.get(...) — metadata is reserved, renamed to extra_metadata
+        meta = tx.extra_metadata or {}
         return {
             "transaction_id": tx.id,
             "event": "payment.captured",
             "payment_id": req.payment_id,
-            "gross_amount": tx.metadata.get("gross_amount"),
-            "platform_fee": tx.metadata.get("platform_fee"),
-            "merchant_net": tx.metadata.get("merchant_net"),
+            "gross_amount": meta.get("gross_amount"),
+            "platform_fee":  meta.get("platform_fee"),
+            "merchant_net":  meta.get("merchant_net"),
             "currency": tx.currency,
             "status": tx.status,
         }
@@ -140,10 +133,6 @@ async def record_refund_event(
     req: RecordRefundRequest,
     db: Session = Depends(get_db),
 ):
-    """
-    Record a refund.
-    Call this when a refund is processed.
-    """
     try:
         tx = record_refund(
             db,
@@ -172,10 +161,6 @@ async def record_void_event(
     req: RecordVoidRequest,
     db: Session = Depends(get_db),
 ):
-    """
-    Record a void.
-    Call this when authorization is cancelled before capture.
-    """
     try:
         tx = record_void(
             db,
@@ -208,7 +193,6 @@ async def get_merchant_balance_endpoint(
     currency: str = "usd",
     db: Session = Depends(get_db),
 ):
-    """Get merchant balance and earnings summary"""
     return get_merchant_balance(db, merchant_id, currency)
 
 
@@ -217,7 +201,6 @@ async def get_platform_balance(
     currency: str = "usd",
     db: Session = Depends(get_db),
 ):
-    """Get platform-wide financial summary"""
     return get_platform_summary(db, currency)
 
 
@@ -227,7 +210,6 @@ async def get_platform_balance(
 
 @app.get("/accounts/{account_id}", response_model=AccountResponse)
 async def get_account(account_id: str, db: Session = Depends(get_db)):
-    """Get account details and balance"""
     account = db.query(Account).filter(Account.id == account_id).first()
     if not account:
         raise HTTPException(status_code=404, detail="Account not found")
@@ -240,7 +222,6 @@ async def list_accounts(
     owner_type: str = None,
     db: Session = Depends(get_db),
 ):
-    """List all accounts with optional filters"""
     query = db.query(Account)
     if owner_id:
         query = query.filter(Account.owner_id == owner_id)
@@ -274,10 +255,6 @@ async def list_accounts(
 
 @app.get("/entries/payment/{payment_id}")
 async def get_payment_entries(payment_id: str, db: Session = Depends(get_db)):
-    """
-    Get all ledger entries for a specific payment.
-    Shows complete money trail.
-    """
     entries = (
         db.query(LedgerEntry)
         .filter(LedgerEntry.payment_id == payment_id)
@@ -303,7 +280,7 @@ async def get_payment_entries(payment_id: str, db: Session = Depends(get_db)):
                 "currency": t.currency,
                 "status": t.status,
                 "description": t.description,
-                "metadata": t.metadata,
+                "metadata": t.extra_metadata,   # ✅ FIX 2: was t.metadata
                 "created_at": t.created_at.isoformat(),
             }
             for t in transactions
@@ -332,7 +309,6 @@ async def get_merchant_entries(
     offset: int = 0,
     db: Session = Depends(get_db),
 ):
-    """Get all ledger entries for a merchant"""
     total = db.query(LedgerEntry).filter(
         LedgerEntry.merchant_id == merchant_id
     ).count()
@@ -374,11 +350,6 @@ async def get_merchant_entries(
 
 @app.get("/reconcile/{payment_id}")
 async def reconcile_payment(payment_id: str, db: Session = Depends(get_db)):
-    """
-    Verify a payment's ledger entries are balanced.
-    Sum of all debits must equal sum of all credits.
-    If not balanced → data integrity problem!
-    """
     entries = (
         db.query(LedgerEntry)
         .filter(LedgerEntry.payment_id == payment_id)
@@ -391,10 +362,10 @@ async def reconcile_payment(payment_id: str, db: Session = Depends(get_db)):
             detail=f"No ledger entries found for payment {payment_id}"
         )
 
-    total_debits = sum(e.amount for e in entries if e.entry_type == "debit")
+    total_debits  = sum(e.amount for e in entries if e.entry_type == "debit")
     total_credits = sum(e.amount for e in entries if e.entry_type == "credit")
-    difference = total_debits - total_credits
-    is_balanced = abs(difference) < 0.000001
+    difference    = total_debits - total_credits
+    is_balanced   = abs(difference) < 0.000001
 
     return {
         "payment_id": payment_id,
@@ -410,10 +381,9 @@ async def reconcile_payment(payment_id: str, db: Session = Depends(get_db)):
 
 @app.get("/stats")
 async def get_stats(db: Session = Depends(get_db)):
-    """Overall ledger statistics"""
-    total_entries = db.query(LedgerEntry).count()
-    total_transactions = db.query(LedgerTransaction).count()
-    total_accounts = db.query(Account).count()
+    total_entries       = db.query(LedgerEntry).count()
+    total_transactions  = db.query(LedgerTransaction).count()
+    total_accounts      = db.query(Account).count()
 
     return {
         "total_entries": total_entries,
@@ -421,9 +391,9 @@ async def get_stats(db: Session = Depends(get_db)):
         "total_accounts": total_accounts,
         "platform_fee_percent": settings.platform_fee_percent,
         "system_accounts": {
-            "escrow": settings.escrow_account_id,
-            "platform": settings.platform_account_id,
-            "fees": settings.fee_account_id,
-            "refund_reserve": settings.refund_reserve_account_id,
+            "escrow":          settings.escrow_account_id,
+            "platform":        settings.platform_account_id,
+            "fees":            settings.fee_account_id,
+            "refund_reserve":  settings.refund_reserve_account_id,
         },
     }

@@ -6,7 +6,9 @@ CREATE DATABASE payment_db;
 CREATE DATABASE fraud_db;
 CREATE DATABASE bank_connector_db;
 CREATE DATABASE ledger_db;
+CREATE DATABASE notification_db;
 
+GRANT ALL PRIVILEGES ON DATABASE notification_db TO payments;
 GRANT ALL PRIVILEGES ON DATABASE gateway_db TO payments;
 GRANT ALL PRIVILEGES ON DATABASE customer_db TO payments;
 GRANT ALL PRIVILEGES ON DATABASE payment_db TO payments;

@@ -12,40 +12,42 @@ from Payment.models.enums import PaymentStatus
 class Payment(Base):
     __tablename__ = "payments"
 
-    id = Column(String(50), primary_key=True)
-    merchant_id = Column(String(50), nullable=False, index=True)
-    customer_id = Column(String(50), nullable=False, index=True)
-    order_id = Column(String(100), index=True)
-    amount = Column(Integer, nullable=False)
-    currency = Column(String(3), nullable=False, default="usd")
-    status = Column(
+    id             = Column(String(50), primary_key=True)
+    merchant_id    = Column(String(50), nullable=False, index=True)
+    customer_id    = Column(String(50), nullable=False, index=True)
+    customer_email = Column(String(255), nullable=True)   # ← ADDED
+    customer_name  = Column(String(255), nullable=True)   # ← ADDED
+    order_id       = Column(String(100), index=True)
+    amount         = Column(Integer, nullable=False)
+    currency       = Column(String(3), nullable=False, default="usd")
+    status         = Column(
         String(30),
         nullable=False,
         default=PaymentStatus.PENDING.value,
         index=True,
     )
 
-    authorization_code = Column(String(50))
-    authorized_at = Column(DateTime)
-    authorized_amount = Column(Integer, default=0)
+    authorization_code       = Column(String(50))
+    authorized_at            = Column(DateTime)
+    authorized_amount        = Column(Integer, default=0)
     authorization_expires_at = Column(DateTime)
 
-    captured_at = Column(DateTime)
+    captured_at     = Column(DateTime)
     amount_captured = Column(Integer, default=0)
-    voided_at = Column(DateTime)
-    void_reason = Column(String(500))
+    voided_at       = Column(DateTime)
+    void_reason     = Column(String(500))
     amount_refunded = Column(Integer, default=0)
 
-    failure_code = Column(String(50))
+    failure_code    = Column(String(50))
     failure_message = Column(String(500))
 
-    card_last4 = Column(String(4))
-    card_brand = Column(String(20))
-    card_exp_month = Column(Integer)
-    card_exp_year = Column(Integer)
+    card_last4       = Column(String(4))
+    card_brand       = Column(String(20))
+    card_exp_month   = Column(Integer)
+    card_exp_year    = Column(Integer)
     card_fingerprint = Column(String(64))
 
-    description = Column(String(500))
+    description   = Column(String(500))
     metadata_json = Column("metadata", JSON)
 
     created_at = Column(DateTime, nullable=False, default=datetime.utcnow, index=True)
@@ -58,47 +60,64 @@ class Payment(Base):
     idempotency_key = Column(String(100), unique=True, index=True)
 
     __table_args__ = (
-        Index("idx_merchant_status", "merchant_id", "status"),
+        Index("idx_merchant_status",  "merchant_id", "status"),
         Index("idx_merchant_created", "merchant_id", "created_at"),
-        Index("idx_order", "order_id"),
+        Index("idx_order",            "order_id"),
     )
+
+    # ── Convenience properties ─────────────────────────────────────────────
+    @property
+    def authorized(self) -> bool:                              # ← ADDED
+        return self.status in ("authorized", "captured", "partially_captured")
+
+    @property
+    def captured(self) -> bool:                               # ← ADDED
+        return self.status in ("captured", "partially_captured")
+
+    @property
+    def voided(self) -> bool:                                 # ← ADDED
+        return self.status == "voided"
+
+    @property
+    def refunded(self) -> bool:                               # ← ADDED
+        return self.status in ("refunded", "partially_refunded")
 
 
 class Transaction(Base):
     __tablename__ = "transactions"
 
-    id = Column(String(50), primary_key=True)
-    payment_id = Column(String(50), nullable=False, index=True)
+    id               = Column(String(50), primary_key=True)
+    payment_id       = Column(String(50), nullable=False, index=True)
     transaction_type = Column(String(30), nullable=False)
-    amount = Column(Integer, nullable=False)
-    currency = Column(String(3), nullable=False)
-    status = Column(String(20), nullable=False)
-    bank_reference = Column(String(100))
+    amount           = Column(Integer, nullable=False)
+    currency         = Column(String(3), nullable=False)
+    status           = Column(String(20), nullable=False)
+    bank_reference   = Column(String(100))
     processor_response = Column(JSON)
-    failure_code = Column(String(50))
-    failure_message = Column(String(500))
-    metadata_json = Column("metadata", JSON)
-    created_at = Column(DateTime, nullable=False, default=datetime.utcnow, index=True)
+    failure_code     = Column(String(50))
+    failure_message  = Column(String(500))
+    metadata_json    = Column("metadata", JSON)
+    created_at       = Column(DateTime, nullable=False, default=datetime.utcnow, index=True)
 
     __table_args__ = (
         Index("idx_payment_created", "payment_id", "created_at"),
-        Index("idx_type_status", "transaction_type", "status"),
+        Index("idx_type_status",     "transaction_type", "status"),
     )
 
 
 class Refund(Base):
     __tablename__ = "refunds"
 
-    id = Column(String(50), primary_key=True)
-    payment_id = Column(String(50), nullable=False, index=True)
-    merchant_id = Column(String(50), nullable=False)
-    amount = Column(Integer, nullable=False)
-    currency = Column(String(3), nullable=False)
-    status = Column(String(20), nullable=False)
-    reason = Column(String(500))
-    bank_reference = Column(String(100))
+    id                 = Column(String(50), primary_key=True)
+    payment_id         = Column(String(50), nullable=False, index=True)
+    merchant_id        = Column(String(50), nullable=False)
+    amount             = Column(Integer, nullable=False)
+    currency           = Column(String(3), nullable=False)
+    status             = Column(String(20), nullable=False)
+    reason             = Column(String(500))
+    bank_reference     = Column(String(100))
     processor_response = Column(JSON)
-    failure_reason = Column(String(500))
-    metadata_json = Column("metadata", JSON)
-    created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
-    succeeded_at = Column(DateTime)
+    failure_reason     = Column(String(500))
+    metadata_json      = Column("metadata", JSON)
+    created_at         = Column(DateTime, nullable=False, default=datetime.utcnow)
+    succeeded_at       = Column(DateTime)
