@@ -12,3 +12,4 @@ asyncpg==0.30.0
 pydantic[email]
 sqlalchemy>=2.0
 psycopg2-binary
+elasticsearch[async]>=8.12.0,<9.0.0

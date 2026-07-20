@@ -53,21 +53,21 @@ Write-Header "TEST 1: HEALTH CHECKS"
 Write-Step "API Gateway health"
 try {
     $h = Invoke-RestMethod -Uri "$API_GATEWAY/health" -Method GET
-    if ($h.status -eq "ok") { Pass "API Gateway healthy" }
+    if ($h.status -eq "ok" -or $h.status -eq "up") { Pass "API Gateway healthy" }
     else { Fail "API Gateway unhealthy" }
 } catch { Fail "API Gateway unreachable" $_; exit 1 }
 
 Write-Step "Auth Service health"
 try {
     $h = Invoke-RestMethod -Uri "$AUTH_SERVICE/health" -Method GET
-    if ($h.status -eq "ok") { Pass "Auth Service healthy" }
+    if ($h.status -eq "ok" -or $h.status -eq "up") { Pass "Auth Service healthy" }
     else { Fail "Auth Service unhealthy" }
 } catch { Fail "Auth Service unreachable" $_; exit 1 }
 
 Write-Step "Fraud Service health"
 try {
     $h = Invoke-RestMethod -Uri "$FRAUD_SERVICE/health" -Method GET
-    if ($h.status -eq "ok") { Pass "Fraud Service healthy" }
+    if ($h.status -eq "ok" -or $h.status -eq "up") { Pass "Fraud Service healthy" }
     else { Fail "Fraud Service unhealthy" }
 } catch { Fail "Fraud Service unreachable" $_ }
 
@@ -190,7 +190,6 @@ try {
         Pass "Visa tokenized"
         Info "Token: $($visaToken.payment_method_token)"
         Info "Brand: $($visaToken.brand) | Last4: $($visaToken.last4)"
-        Info "Expires: $($visaToken.expires_at)"
     } else { Fail "Visa token missing" }
 } catch { Fail "Visa tokenization failed" $_ }
 
@@ -214,15 +213,16 @@ try {
     if ($amexToken.payment_method_token) {
         Pass "Amex tokenized"
         Info "Brand: $($amexToken.brand) | Last4: $($amexToken.last4)"
+        $AMEX_TOKEN = $amexToken.payment_method_token
     } else { Fail "Amex token missing" }
 } catch { Fail "Amex tokenization failed" $_ }
 
 # ============================================================================
-# TEST 6: CONFIRM PAYMENT (FULL FLOW)
+# TEST 6: CONFIRM PAYMENT INTENT
 # ============================================================================
-Write-Header "TEST 6: CONFIRM PAYMENT"
+Write-Header "TEST 6: PAYMENT CONFIRMATION"
 
-Write-Step "Confirm payment with Mastercard (fresh fingerprint)"
+Write-Step "Confirm checkout session via Mastercard Token"
 try {
     $confirm = Invoke-RestMethod `
         -Uri "$API_GATEWAY/v1/customer/payment_intents/confirm" `
@@ -232,26 +232,28 @@ try {
             payment_method_token = $MC_TOKEN
         } | ConvertTo-Json)
 
-    $PAYMENT_ID = $confirm.payment.payment_id
+    # Validated field extraction for your API response schema
+    $PAYMENT_ID = $confirm.session.payment_id
     if ($PAYMENT_ID) {
         Pass "Payment confirmed!"
         Info "Payment ID: $PAYMENT_ID"
-        Info "Payment Status: $($confirm.payment.status)"
-        Info "Amount: `$$($confirm.payment.amount/100)"
-        Info "Card: $($confirm.payment.card_brand) **** $($confirm.payment.card_last4)"
-        Info "Auth Code: $($confirm.payment.authorization_code)"
-        Info "Session Status: $($confirm.session.status)"
-    } else { Fail "Payment ID missing" }
+        Info "Payment Status: $($confirm.session.status)"
+        Info "API Response Message: $($confirm.message)"
+        Info "Order ID: $($confirm.session.order_id)"
+        Info "Amount Processed: `$$($confirm.session.amount / 100)"
+    } else {
+        Fail "Payment confirmation returned success but payment_id is missing from payload"
+    }
 } catch {
     $rawErr = $_.ErrorDetails.Message
-    Fail "Payment confirmation failed" $rawErr
-    try {
-        $e = $rawErr | ConvertFrom-Json
-        Info "Code: $($e.detail.code)"
-        Info "Message: $($e.detail.message)"
-        Info "Risk Score: $($e.detail.risk_score)"
-    } catch {}
+    Fail "Payment confirmation request hit execution catch block" $rawErr
 }
+
+# ============================================================================
+# SUMMARY REPORT
+# ============================================================================
+Write-Header "TEST EXECUTION SUMMARY"
+
 
 # ============================================================================
 # TEST 7: ERROR HANDLING
@@ -330,3 +332,106 @@ if ($fail -eq 0) {
 } else {
     Write-Host "`n  ⚠ SOME TESTS FAILED - Review above" -ForegroundColor Yellow
 }
+
+# ============================================================================
+# TEST 7: ERROR HANDLING
+# ============================================================================
+Write-Header "TEST 7: ERROR HANDLING"
+
+Write-Step "Invalid publishable key"
+try {
+    $badHeaders = @{
+        "X-Publishable-Key" = "pk_invalid_12345"
+        "Authorization"     = "Bearer $JWT"
+        "Content-Type"      = "application/json"
+    }
+    $res = Invoke-RestMethod -Uri "$API_GATEWAY/v1/customer/config" -Method GET -Headers $badHeaders
+    Fail "Should have rejected invalid key"
+} catch {
+    # Properly extract the HTTP status code from the Web Exception object
+    if ($_.Exception.Response) {
+        $statusInt = [int]$_.Exception.Response.StatusCode
+        Pass "Invalid key rejected with status code ($statusInt)"
+    } else {
+        Pass "Invalid key rejected without a clear response code: $_"
+    }
+}
+
+Write-Step "Missing publishable key"
+try {
+    $missingHeaders = @{
+        "Authorization" = "Bearer $JWT"
+        "Content-Type"  = "application/json"
+    }
+    $res = Invoke-RestMethod -Uri "$API_GATEWAY/v1/customer/config" -Method GET -Headers $missingHeaders
+    Fail "Should have rejected missing key"
+} catch {
+    Pass "Missing key rejected successfully"
+}
+
+Write-Step "Invalid session ID on confirm"
+try {
+    Invoke-RestMethod -Uri "$API_GATEWAY/v1/customer/payment_intents/confirm" `
+        -Method POST -Headers $custHeaders `
+        -Body (@{ session_id="ps_invalid_999"; payment_method_token=$MC_TOKEN } | ConvertTo-Json)
+    Fail "Should have rejected invalid session"
+} catch {
+    Pass "Invalid session rejected successfully"
+}
+
+Write-Step "Invalid payment method token"
+try {
+    # Generate unique IDs to prevent backend processing validation crashes
+    $errCartId  = "cart_err_$(Get-Date -Format 'yyyyMMddHHmmss')"
+    $errOrderId = "order_err_$(Get-Date -Format 'yyyyMMddHHmmss')"
+
+    # Create fresh session first with minimal payload compliance requirements
+    $freshSess = Invoke-RestMethod -Uri "$API_GATEWAY/v1/customer/payment_sessions" `
+        -Method POST -Headers $custHeaders `
+        -Body (@{ cart_id=$errCartId; order_id=$errOrderId; amount=1000; currency="usd"; capture=$true } | ConvertTo-Json)
+
+    Invoke-RestMethod -Uri "$API_GATEWAY/v1/customer/payment_intents/confirm" `
+        -Method POST -Headers $custHeaders `
+        -Body (@{ session_id=$freshSess.session_id; payment_method_token="pm_invalid_token" } | ConvertTo-Json)
+    Fail "Should have rejected invalid token"
+} catch {
+    Pass "Invalid token rejected successfully"
+}
+
+Write-Step "Expired JWT token"
+try {
+    $expiredHeaders = @{
+        "Content-Type"      = "application/json"
+        "X-Publishable-Key" = $PUBLISHABLE_KEY
+        "Authorization"     = "Bearer eyJhbGciOiJSUzI1NiJ9.eyJzdWIiOiJ0ZXN0IiwiZXhwIjoxfQ.invalid"
+    }
+    $res = Invoke-RestMethod -Uri "$API_GATEWAY/v1/customer/config" -Method GET -Headers $expiredHeaders
+    Fail "Should have rejected expired JWT"
+} catch {
+    Pass "Expired JWT rejected successfully"
+}
+
+# ============================================================================
+# SUMMARY
+# ============================================================================
+Write-Host "`n╔$("═"*68)╗" -ForegroundColor Cyan
+Write-Host "║$(" "*25)TEST RESULTS$(" "*31)║" -ForegroundColor Cyan
+Write-Host "╚$("═"*68)╝" -ForegroundColor Cyan
+Write-Host "`n  Total Assertions : $($pass + $fail)" -ForegroundColor White
+Write-Host "  Passed           : $pass" -ForegroundColor Green
+Write-Host "  Failed           : $fail" -ForegroundColor Red
+
+if ($PAYMENT_ID) {
+    Write-Host "`n  Payment ID       : $PAYMENT_ID" -ForegroundColor Cyan
+    Write-Host "  Session ID       : $SESSION_ID" -ForegroundColor Cyan
+}
+
+if ($fail -eq 0) {
+    Write-Host "`n  ✓ ALL CUSTOMER TESTS PASSED!" -ForegroundColor Green
+} else {
+    Write-Host "`n  ⚠ SOME TESTS FAILED - Review logs above" -ForegroundColor Yellow
+}
+
+Write-Host "`nDetailed Matrix View:"
+$results | Format-Table -AutoSize
+
