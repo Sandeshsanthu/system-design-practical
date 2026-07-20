@@ -1,0 +1,59 @@
+# filename: Payment-gt/Deployments/kustomization.yaml
+
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+# ── Kubernetes manifest files for every service ──────────────────────────────
+resources:
+  - gateway.yaml
+  - auth-service.yaml
+  - customer-service.yaml
+  - merchant-service.yaml
+  - payment-service.yaml
+  - fraud-service.yaml
+  - bank-connector.yaml
+  - ledger-service.yaml
+  - notification-service.yaml
+  - reconciliation-service.yaml
+
+# ── Image tags — CI pipeline stamps newTag with ${{ github.sha }} ─────────────
+images:
+  - name: sandeshs/payment-gt-gateway
+    newName: sandeshs/payment-gt-gateway
+    newTag: latest
+
+  - name: sandeshs/payment-gt-auth-service
+    newName: sandeshs/payment-gt-auth-service
+    newTag: latest
+
+  - name: sandeshs/payment-gt-customer-service
+    newName: sandeshs/payment-gt-customer-service
+    newTag: latest
+
+  - name: sandeshs/payment-gt-merchant-service
+    newName: sandeshs/payment-gt-merchant-service
+    newTag: latest
+
+  - name: sandeshs/payment-gt-payment-service
+    newName: sandeshs/payment-gt-payment-service
+    newTag: latest
+
+  - name: sandeshs/payment-gt-fraud-service
+    newName: sandeshs/payment-gt-fraud-service
+    newTag: latest
+
+  - name: sandeshs/payment-gt-bank-connector
+    newName: sandeshs/payment-gt-bank-connector
+    newTag: latest
+
+  - name: sandeshs/payment-gt-ledger-service
+    newName: sandeshs/payment-gt-ledger-service
+    newTag: latest
+
+  - name: sandeshs/payment-gt-notification-service
+    newName: sandeshs/payment-gt-notification-service
+    newTag: latest
+
+  - name: sandeshs/payment-gt-reconciliation-service
+    newName: sandeshs/payment-gt-reconciliation-service
+    newTag: latest
