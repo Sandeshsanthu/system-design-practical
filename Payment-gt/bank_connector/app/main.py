@@ -3,17 +3,7 @@
 
 import logging
 import time
-import uuid
-from contextlib import asynccontextmanager
-from datetime import datetime
 
-from fastapi import Depends, FastAPI, HTTPException, Header, Request
-from sqlalchemy.orm import Session
-
-from bank_connector.app.config import settings
-from bank_connector.app.db import Base, engine, get_db
-from bank_connector.app.models.transaction import ProcessorTransaction, CircuitBreakerState
-from bank_connector.app.processors.router import ProcessorRouter
 from bank_connector.app.schemas.connector import (
     AuthorizeRequest,
     CaptureRequest,
@@ -22,9 +12,21 @@ from bank_connector.app.schemas.connector import (
     RefundRequest,
     VoidRequest,
 )
-from bank_connector.app.services.circuit_breaker import CircuitBreaker, CircuitState
-from bank_connector.app.services.idempotency import get_existing_transaction
 
+
+
+import uuid
+from contextlib import asynccontextmanager
+
+from fastapi import Depends, FastAPI, HTTPException
+from sqlalchemy.orm import Session
+
+from bank_connector.app.config import settings
+from bank_connector.app.db import Base, engine, get_db
+from bank_connector.app.models.transaction import ProcessorTransaction
+from bank_connector.app.processors.router import ProcessorRouter
+from bank_connector.app.services.circuit_breaker import CircuitBreaker
+from bank_connector.app.services.idempotency import get_existing_transaction
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
@@ -421,8 +423,8 @@ async def get_transactions(payment_id: str, db: Session = Depends(get_db)):
 async def get_stats(db: Session = Depends(get_db)):
     """Processor performance stats"""
     total = db.query(ProcessorTransaction).count()
-    successful = db.query(ProcessorTransaction).filter(ProcessorTransaction.success == True).count()
-    failed = db.query(ProcessorTransaction).filter(ProcessorTransaction.success == False).count()
+    successful = db.query(ProcessorTransaction).filter(ProcessorTransaction.success).count()
+    failed = db.query(ProcessorTransaction).filter(~ProcessorTransaction.success).count()
 
     cb_status = {
         name: cb.get_status()

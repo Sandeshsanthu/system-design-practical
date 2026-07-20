@@ -5,7 +5,6 @@ import os
 import pickle
 import logging
 import numpy as np
-from datetime import datetime
 from sklearn.ensemble import GradientBoostingClassifier
 from sklearn.preprocessing import StandardScaler
 

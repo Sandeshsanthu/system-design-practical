@@ -14,7 +14,7 @@ class BlocklistRules:
             db.query(Blocklist)
             .filter(Blocklist.type == type_, Blocklist.value == value.lower())
             .filter(
-                (Blocklist.expires_at == None) |
+                (Blocklist.expires_at.is_(None)) |
                 (Blocklist.expires_at > datetime.utcnow())
             )
             .first()

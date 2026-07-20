@@ -24,7 +24,7 @@ def get_existing_transaction(
             ProcessorTransaction.idempotency_key == idempotency_key,
             ProcessorTransaction.payment_id == payment_id,
             ProcessorTransaction.operation == operation,
-            ProcessorTransaction.success == True,
+            ProcessorTransaction.success,
         )
         .first()
     )

@@ -342,8 +342,8 @@ async def get_card_history(card_fingerprint: str, db: Session = Depends(get_db))
 @app.get("/stats")
 async def get_stats(db: Session = Depends(get_db)):
     total = db.query(FraudCheck).count()
-    blocked = db.query(FraudCheck).filter(FraudCheck.allowed == False).count()
-    reviewed = db.query(FraudCheck).filter(FraudCheck.review_required == True).count()
+    blocked = db.query(FraudCheck).filter(~FraudCheck.allowed).count()
+    reviewed = db.query(FraudCheck).filter(FraudCheck.review_required).count()
     return {
         "total_checks": total,
         "allowed": total - blocked,
