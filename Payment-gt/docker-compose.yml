@@ -70,7 +70,7 @@ services:
       retries: 20
   fraud-service:
     image: sandeshs/payment-gt-fraud-service:8b85ed6da0f092b603a6c7798b15633f3d3e619c
-    container_name: fraud-service
+    container_name: fraud_service
     ports:
       - "8004:8004"
     environment:
@@ -126,7 +126,7 @@ services:
       retries: 20
   ledger-service:
     image: sandeshs/payment-gt-ledger-service:8b85ed6da0f092b603a6c7798b15633f3d3e619c
-    container_name: ledger-service
+    container_name: ledger_service
     ports:
       - "8007:8007"
     environment:

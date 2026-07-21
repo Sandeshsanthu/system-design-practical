@@ -48,7 +48,7 @@ async def lifespan(app: FastAPI):
     logger.info("Fraud Service stopped")
 
 
-app = FastAPI(title="fraud-service", version="1.0.0", lifespan=lifespan)
+app = FastAPI(title="fraud_service", version="1.0.0", lifespan=lifespan)
 
 
 # ============================================================================
@@ -57,7 +57,7 @@ app = FastAPI(title="fraud-service", version="1.0.0", lifespan=lifespan)
 
 @app.get("/health")
 async def health():
-    return {"status": "ok", "service": "fraud-service"}
+    return {"status": "ok", "service": "fraud_service"}
 
 
 # ============================================================================

@@ -5,7 +5,7 @@ import os
 
 
 class Settings:
-    service_name: str = os.getenv("SERVICE_NAME", "ledger-service")
+    service_name: str = os.getenv("SERVICE_NAME", "ledger_service")
     port: int = int(os.getenv("PORT", "8007"))
     database_url: str = os.getenv(
         "DATABASE_URL",

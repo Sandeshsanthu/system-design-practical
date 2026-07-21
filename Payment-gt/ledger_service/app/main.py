@@ -50,7 +50,7 @@ async def lifespan(app: FastAPI):
     logger.info("Ledger Service stopped")
 
 
-app = FastAPI(title="ledger-service", version="1.0.0", lifespan=lifespan)
+app = FastAPI(title="ledger_service", version="1.0.0", lifespan=lifespan)
 
 
 # ============================================================================
@@ -59,7 +59,7 @@ app = FastAPI(title="ledger-service", version="1.0.0", lifespan=lifespan)
 
 @app.get("/health")
 async def health():
-    return {"status": "ok", "service": "ledger-service"}
+    return {"status": "ok", "service": "ledger_service"}
 
 
 # ============================================================================

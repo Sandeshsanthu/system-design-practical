@@ -5,7 +5,7 @@ import os
 
 
 class Settings:
-    service_name: str = os.getenv("SERVICE_NAME", "fraud-service")
+    service_name: str = os.getenv("SERVICE_NAME", "fraud_service")
     database_url: str = os.getenv(
         "DATABASE_URL",
         "postgresql://payments:payments@postgres:5432/fraud_db",
