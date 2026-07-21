@@ -3,7 +3,6 @@
 
 import logging
 from contextlib import asynccontextmanager
-from datetime import datetime
 
 from fastapi import Depends, FastAPI, HTTPException, Query
 from sqlalchemy.orm import Session
@@ -14,7 +13,6 @@ from ledger_service.app.models.ledger import Account, LedgerEntry, LedgerTransac
 from ledger_service.app.schemas.ledger import (
     AccountResponse,
     BalanceSummary,
-    LedgerTransactionResponse,
     PlatformSummary,
     RecordAuthorizationRequest,
     RecordCaptureRequest,
@@ -23,7 +21,6 @@ from ledger_service.app.schemas.ledger import (
 )
 from ledger_service.app.services.account_service import (
     ensure_system_accounts,
-    get_merchant_account_id,
 )
 from ledger_service.app.services.balance_service import (
     get_merchant_balance,

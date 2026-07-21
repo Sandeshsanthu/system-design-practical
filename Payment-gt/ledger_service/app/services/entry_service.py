@@ -5,7 +5,6 @@ import logging
 import uuid
 from decimal import Decimal, ROUND_HALF_UP
 
-from fastapi import HTTPException
 from sqlalchemy.orm import Session
 
 from ledger_service.app.config import settings

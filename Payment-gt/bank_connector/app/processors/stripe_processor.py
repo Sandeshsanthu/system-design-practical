@@ -291,7 +291,7 @@ class StripeProcessor(BaseProcessor):
                 failure_message=str(e),
             )
 
-        except RETRYABLE_ERRORS as e:
+        except RETRYABLE_ERRORS:
             raise
 
     async def void(self, request: VoidRequest) -> ProcessorResponse:
@@ -329,7 +329,7 @@ class StripeProcessor(BaseProcessor):
                 failure_message=str(e),
             )
 
-        except RETRYABLE_ERRORS as e:
+        except RETRYABLE_ERRORS:
             raise
 
     async def health_check(self) -> bool:

@@ -33,13 +33,14 @@ async def health():
 
 @router.get("/stats", response_model=StatsResponse)
 async def stats(db: AsyncSession = Depends(get_db)):
-    total  = await db.scalar(select(func.count(Notification.id)))
-    sent   = await db.scalar(select(func.count(Notification.id)).where(Notification.status == "sent"))
+    total = await db.scalar(select(func.count(Notification.id)))
+    sent = await db.scalar(select(func.count(Notification.id)).where(Notification.status == "sent"))
     failed = await db.scalar(select(func.count(Notification.id)).where(Notification.status == "failed"))
-    pending= await db.scalar(select(func.count(Notification.id)).where(Notification.status == "pending"))
+    pending = await db.scalar(select(func.count(Notification.id)).where(Notification.status == "pending"))
 
-    total_wh  = await db.scalar(select(func.count(MerchantWebhook.id)))
-    active_wh = await db.scalar(select(func.count(MerchantWebhook.id)).where(MerchantWebhook.is_active == True))  # noqa: E712
+    total_wh = await db.scalar(select(func.count(MerchantWebhook.id)))
+    active_wh = await db.scalar(
+        select(func.count(MerchantWebhook.id)).where(MerchantWebhook.is_active == True))  # noqa: E712
     total_del = await db.scalar(select(func.count(WebhookDelivery.id)))
 
     return StatsResponse(
@@ -75,11 +76,11 @@ async def get_payment_notifications(payment_id: str, db: AsyncSession = Depends(
 @router.post("/webhooks/register", response_model=WebhookResponse, status_code=201)
 async def register_webhook(req: WebhookRegisterRequest, db: AsyncSession = Depends(get_db)):
     wh = MerchantWebhook(
-        merchant_id = req.merchant_id,
-        url         = req.url,
-        description = req.description,
-        events      = ",".join(req.events),
-        secret      = secrets.token_hex(32),   # per-webhook secret for HMAC signing
+        merchant_id=req.merchant_id,
+        url=req.url,
+        description=req.description,
+        events=",".join(req.events),
+        secret=secrets.token_hex(32),  # per-webhook secret for HMAC signing
     )
     db.add(wh)
     await db.commit()
@@ -98,15 +99,21 @@ async def list_webhooks(merchant_id: str, db: AsyncSession = Depends(get_db)):
 
 @router.patch("/webhooks/{webhook_id}", response_model=WebhookResponse)
 async def update_webhook(
-    webhook_id: str, req: WebhookUpdateRequest, db: AsyncSession = Depends(get_db)
+        webhook_id: str, req: WebhookUpdateRequest, db: AsyncSession = Depends(get_db)
 ):
     wh = await db.get(MerchantWebhook, webhook_id)
     if not wh:
         raise HTTPException(404, "Webhook not found")
-    if req.url is not None:         wh.url = req.url
-    if req.description is not None: wh.description = req.description
-    if req.events is not None:      wh.events = ",".join(req.events)
-    if req.is_active is not None:   wh.is_active = req.is_active
+
+    if req.url is not None:
+        wh.url = req.url
+    if req.description is not None:
+        wh.description = req.description
+    if req.events is not None:
+        wh.events = ",".join(req.events)
+    if req.is_active is not None:
+        wh.is_active = req.is_active
+
     await db.commit()
     await db.refresh(wh)
     return wh
@@ -135,9 +142,9 @@ async def rotate_webhook_secret(webhook_id: str, db: AsyncSession = Depends(get_
 # ── Webhook delivery history ──────────────────────────────────────────────────
 @router.get("/webhooks/{webhook_id}/deliveries", response_model=list[WebhookDeliveryResponse])
 async def get_webhook_deliveries(
-    webhook_id: str,
-    limit: int = 50,
-    db: AsyncSession = Depends(get_db),
+        webhook_id: str,
+        limit: int = 50,
+        db: AsyncSession = Depends(get_db),
 ):
     result = await db.execute(
         select(WebhookDelivery)

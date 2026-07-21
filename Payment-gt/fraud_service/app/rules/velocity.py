@@ -101,7 +101,7 @@ class VelocityRules:
         ).count()
         customer_failed = db.query(FraudCheck).filter(
             FraudCheck.customer_id == customer_id,
-            FraudCheck.allowed == False
+            not FraudCheck.allowed
         ).count()
         return {
             "card_velocity_1h": card_count,

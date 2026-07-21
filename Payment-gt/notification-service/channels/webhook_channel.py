@@ -11,7 +11,7 @@ from datetime import datetime, timezone, timedelta
 
 import httpx
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, update
+from sqlalchemy import select
 
 from config import get_settings
 from models import MerchantWebhook, WebhookDelivery, DeliveryStatus

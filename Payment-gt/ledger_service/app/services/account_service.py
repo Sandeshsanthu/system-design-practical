@@ -2,7 +2,6 @@
 # filename: ledger_service/app/services/account_service.py
 
 import logging
-import uuid
 from decimal import Decimal
 
 from sqlalchemy.orm import Session
