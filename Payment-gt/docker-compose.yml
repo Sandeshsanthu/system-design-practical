@@ -57,7 +57,7 @@ services:
       start_period: 30s
     restart: unless-stopped
   auth-service:
-    image: sandeshs/payment-gt-auth-service:8b85ed6da0f092b603a6c7798b15633f3d3e619c
+    image: sandeshs/payment-gt-auth-service:89c1046169a60977184f9fb4bae7480dead492d8
     container_name: auth-service
     ports:
       - "9000:9000"
@@ -69,7 +69,7 @@ services:
       timeout: 3s
       retries: 20
   fraud-service:
-    image: sandeshs/payment-gt-fraud-service:8b85ed6da0f092b603a6c7798b15633f3d3e619c
+    image: sandeshs/payment-gt-fraud-service:2ba338ba69756fd365761f01faa2e9d08bba3d62
     container_name: fraud_service
     ports:
       - "8004:8004"
@@ -98,7 +98,7 @@ services:
       timeout: 3s
       retries: 20
   bank-connector:
-    image: sandeshs/payment-gt-bank-connector:8b85ed6da0f092b603a6c7798b15633f3d3e619c
+    image: sandeshs/payment-gt-bank-connector:89c1046169a60977184f9fb4bae7480dead492d8
     container_name: bank_connector
     ports:
       - "8006:8005"
