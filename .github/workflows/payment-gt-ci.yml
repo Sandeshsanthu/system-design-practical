@@ -278,9 +278,9 @@ jobs:
           - customer-service
           - merchant-service
           - payment-service
-          - fraud-service
-          - bank-connector
-          - ledger-service
+          - fraud_service
+          - bank_connector
+          - ledger_service
           - notification-service
           - reconciliation-service
 
@@ -353,9 +353,9 @@ jobs:
             ${{ env.REGISTRY_USER }}/payment-gt-customer-service=${{ env.REGISTRY_USER }}/payment-gt-customer-service:${{ github.sha }} \
             ${{ env.REGISTRY_USER }}/payment-gt-merchant-service=${{ env.REGISTRY_USER }}/payment-gt-merchant-service:${{ github.sha }} \
             ${{ env.REGISTRY_USER }}/payment-gt-payment-service=${{ env.REGISTRY_USER }}/payment-gt-payment-service:${{ github.sha }} \
-            ${{ env.REGISTRY_USER }}/payment-gt-fraud-service=${{ env.REGISTRY_USER }}/payment-gt-fraud-service:${{ github.sha }} \
-            ${{ env.REGISTRY_USER }}/payment-gt-bank-connector=${{ env.REGISTRY_USER }}/payment-gt-bank-connector:${{ github.sha }} \
-            ${{ env.REGISTRY_USER }}/payment-gt-ledger-service=${{ env.REGISTRY_USER }}/payment-gt-ledger-service:${{ github.sha }} \
+            ${{ env.REGISTRY_USER }}/payment-gt-fraud_service=${{ env.REGISTRY_USER }}/payment-gt-fraud_service:${{ github.sha }} \
+            ${{ env.REGISTRY_USER }}/payment-gt-bank_connector=${{ env.REGISTRY_USER }}/payment-gt-bank_connector:${{ github.sha }} \
+            ${{ env.REGISTRY_USER }}/payment-gt-ledger_service=${{ env.REGISTRY_USER }}/payment-gt-ledger_service:${{ github.sha }} \
             ${{ env.REGISTRY_USER }}/payment-gt-notification-service=${{ env.REGISTRY_USER }}/payment-gt-notification-service:${{ github.sha }} \
             ${{ env.REGISTRY_USER }}/payment-gt-reconciliation-service=${{ env.REGISTRY_USER }}/payment-gt-reconciliation-service:${{ github.sha }}
 

@@ -5,16 +5,16 @@ kind: Kustomization
 
 # ── Kubernetes manifest files for every service ──────────────────────────────
 resources:
-- api-gatway.yaml
-- auth_service.yaml
-- customer_service.yaml
-- merchant_service.yaml
-- Payment.yaml
+- gateway.yaml
+- auth-service.yaml
+- customer-service.yaml
+- merchant-service.yaml
+- payment-service.yaml
 - fraud_service.yaml
 - bank_connector.yaml
 - ledger_service.yaml
 - notification-service.yaml
-- reconciliation_service.yaml
+- reconciliation-service.yaml
 
 # ── Image tags — CI pipeline stamps newTag with ${{ github.sha }} ─────────────
 
@@ -27,42 +27,42 @@ resources:
 
 
 images:
-- name: sandeshs/payment-gt-auth_service
-  newName: sandeshs/payment-gt-auth_service
-  newTag: 89c1046169a60977184f9fb4bae7480dead492d8
+- name: sandeshs/payment-gt-auth-service
+  newName: sandeshs/payment-gt-auth-service
+  newTag: 0e4ab16e161bb86bdb93bb62503f1cd836eafa4f
 - name: sandeshs/payment-gt-bank-connector
   newName: sandeshs/payment-gt-bank-connector
-  newTag: 89c1046169a60977184f9fb4bae7480dead492d8
+  newTag: 0e4ab16e161bb86bdb93bb62503f1cd836eafa4f
 - name: sandeshs/payment-gt-bank_connector
   newName: sandeshs/payment-gt-bank_connector
   newTag: 8b85ed6da0f092b603a6c7798b15633f3d3e619c
-- name: sandeshs/payment-gt-customer_service
-  newName: sandeshs/payment-gt-customer_service
-  newTag: 89c1046169a60977184f9fb4bae7480dead492d8
+- name: sandeshs/payment-gt-customer-service
+  newName: sandeshs/payment-gt-customer-service
+  newTag: 0e4ab16e161bb86bdb93bb62503f1cd836eafa4f
 - name: sandeshs/payment-gt-fraud-service
   newName: sandeshs/payment-gt-fraud-service
-  newTag: 89c1046169a60977184f9fb4bae7480dead492d8
+  newTag: 0e4ab16e161bb86bdb93bb62503f1cd836eafa4f
 - name: sandeshs/payment-gt-fraud_service
   newName: sandeshs/payment-gt-fraud_service
   newTag: 8b85ed6da0f092b603a6c7798b15633f3d3e619c
-- name: sandeshs/payment-gt-api-gatway
-  newName: sandeshs/payment-gt-api-gatway
-  newTag: 89c1046169a60977184f9fb4bae7480dead492d8
+- name: sandeshs/payment-gt-gateway
+  newName: sandeshs/payment-gt-gateway
+  newTag: 0e4ab16e161bb86bdb93bb62503f1cd836eafa4f
 - name: sandeshs/payment-gt-ledger-service
   newName: sandeshs/payment-gt-ledger-service
-  newTag: 89c1046169a60977184f9fb4bae7480dead492d8
+  newTag: 0e4ab16e161bb86bdb93bb62503f1cd836eafa4f
 - name: sandeshs/payment-gt-ledger_service
   newName: sandeshs/payment-gt-ledger_service
   newTag: 8b85ed6da0f092b603a6c7798b15633f3d3e619c
-- name: sandeshs/payment-gt-merchant_service
-  newName: sandeshs/payment-gt-merchant_service
-  newTag: 89c1046169a60977184f9fb4bae7480dead492d8
+- name: sandeshs/payment-gt-merchant-service
+  newName: sandeshs/payment-gt-merchant-service
+  newTag: 0e4ab16e161bb86bdb93bb62503f1cd836eafa4f
 - name: sandeshs/payment-gt-notification-service
   newName: sandeshs/payment-gt-notification-service
-  newTag: 89c1046169a60977184f9fb4bae7480dead492d8
-- name: sandeshs/payment-gt-Payment
-  newName: sandeshs/payment-gt-Payment
-  newTag: 89c1046169a60977184f9fb4bae7480dead492d8
-- name: sandeshs/payment-gt-reconciliation_service
-  newName: sandeshs/payment-gt-reconciliation_service
-  newTag: 89c1046169a60977184f9fb4bae7480dead492d8
+  newTag: 0e4ab16e161bb86bdb93bb62503f1cd836eafa4f
+- name: sandeshs/payment-gt-payment-service
+  newName: sandeshs/payment-gt-payment-service
+  newTag: 0e4ab16e161bb86bdb93bb62503f1cd836eafa4f
+- name: sandeshs/payment-gt-reconciliation-service
+  newName: sandeshs/payment-gt-reconciliation-service
+  newTag: 0e4ab16e161bb86bdb93bb62503f1cd836eafa4f
