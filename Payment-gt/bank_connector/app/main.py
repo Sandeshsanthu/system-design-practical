@@ -47,7 +47,7 @@ async def lifespan(app: FastAPI):
     logger.info("Bank Connector stopped")
 
 
-app = FastAPI(title="bank-connector", version="1.0.0", lifespan=lifespan)
+app = FastAPI(title="bank_connector", version="1.0.0", lifespan=lifespan)
 
 
 def _save_transaction(
@@ -107,7 +107,7 @@ async def health():
 
     return HealthResponse(
         status="ok",
-        service="bank-connector",
+        service="bank_connector",
         stripe_connected=stripe_ok,
         circuit_breakers=cb_status,
     )

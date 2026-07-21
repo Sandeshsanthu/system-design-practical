@@ -2,10 +2,10 @@
 # filename: Payment/services/bank_connector_client.py
 
 """
-HTTP client for the bank-connector microservice.
+HTTP client for the bank_connector microservice.
 Replaces the old bank_gateway.py mock entirely.
 
-bank-connector handles:
+bank_connector handles:
   - Stripe API calls
   - Retry logic with tenacity
   - Circuit breaker
@@ -34,7 +34,7 @@ async def call_bank_authorize(
     metadata: dict = None,
 ) -> dict:
     """
-    POST /authorize → bank-connector → Stripe PaymentIntent (capture_method=manual)
+    POST /authorize → bank_connector → Stripe PaymentIntent (capture_method=manual)
     Returns a dict compatible with existing endpoints.py access patterns.
     """
     payload = {
@@ -59,7 +59,7 @@ async def call_bank_authorize(
 
         data = resp.json()
 
-        # bank-connector raises 402 on card decline — parse detail
+        # bank_connector raises 402 on card decline — parse detail
         if resp.status_code == 402:
             detail = data.get("detail", {})
             return {
@@ -99,7 +99,7 @@ async def call_bank_capture(
     idempotency_key: str = None,
 ) -> dict:
     """
-    POST /capture → bank-connector → stripe.PaymentIntent.capture()
+    POST /capture → bank_connector → stripe.PaymentIntent.capture()
     """
     payload = {
         "payment_id":         payment_id,
@@ -134,7 +134,7 @@ async def call_bank_void(
     idempotency_key: str = None,
 ) -> dict:
     """
-    POST /void → bank-connector → stripe.PaymentIntent.cancel()
+    POST /void → bank_connector → stripe.PaymentIntent.cancel()
     """
     payload = {
         "payment_id":         payment_id,
@@ -170,7 +170,7 @@ async def call_bank_refund(
     idempotency_key: str = None,
 ) -> dict:
     """
-    POST /refund → bank-connector → stripe.Refund.create()
+    POST /refund → bank_connector → stripe.Refund.create()
     """
     payload = {
         "payment_id":      payment_id,

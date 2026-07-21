@@ -11,7 +11,7 @@ resources:
 - merchant-service.yaml
 - payment-service.yaml
 - fraud-service.yaml
-- bank-connector.yaml
+- bank_connector.yaml
 - ledger-service.yaml
 - notification-service.yaml
 - reconciliation-service.yaml
@@ -30,8 +30,8 @@ images:
 - name: sandeshs/payment-gt-auth-service
   newName: sandeshs/payment-gt-auth-service
   newTag: 8b85ed6da0f092b603a6c7798b15633f3d3e619c
-- name: sandeshs/payment-gt-bank-connector
-  newName: sandeshs/payment-gt-bank-connector
+- name: sandeshs/payment-gt-bank_connector
+  newName: sandeshs/payment-gt-bank_connector
   newTag: 8b85ed6da0f092b603a6c7798b15633f3d3e619c
 - name: sandeshs/payment-gt-customer-service
   newName: sandeshs/payment-gt-customer-service

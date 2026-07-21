@@ -5,7 +5,7 @@ import os
 
 
 class Settings:
-    service_name: str = os.getenv("SERVICE_NAME", "bank-connector")
+    service_name: str = os.getenv("SERVICE_NAME", "bank_connector")
     port: int = int(os.getenv("PORT", "8005"))
     database_url: str = os.getenv(
         "DATABASE_URL",
