@@ -40,7 +40,7 @@ async def lifespan(app: FastAPI):
     await app.state.redis.aclose()
     await app.state.db.close()
 
-app = FastAPI(title="payment-api-gateway", lifespan=lifespan)
+app = FastAPI(title="payment-api-api-gatway", lifespan=lifespan)
 
 @app.middleware("http")
 async def cors(request: Request, call_next):

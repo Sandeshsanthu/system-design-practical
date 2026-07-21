@@ -16,7 +16,7 @@ from pydantic import BaseModel
 
 
 
-app = FastAPI(title="auth-service")
+app = FastAPI(title="auth_service")
 
 ISSUER = "http://auth-service:9000"
 

@@ -10,7 +10,7 @@ import httpx
 from fastapi import FastAPI, Header, HTTPException
 from pydantic import BaseModel, EmailStr, Field
 
-logger = logging.getLogger("merchant-service")
+logger = logging.getLogger("merchant_service")
 
 PAYMENT_ENGINE_URL = os.getenv("PAYMENT_ENGINE_URL", "http://payment-service:8003").rstrip("/")
 INTERNAL_SERVICE_SECRET = os.getenv("INTERNAL_SERVICE_SECRET", "change-me-in-production")
@@ -67,7 +67,7 @@ async def lifespan(app: FastAPI):
     await app.state.http_client.aclose()
 
 
-app = FastAPI(title="merchant-service", lifespan=lifespan)
+app = FastAPI(title="merchant_service", lifespan=lifespan)
 
 
 @app.get("/health")

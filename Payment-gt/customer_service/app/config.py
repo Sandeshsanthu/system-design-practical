@@ -5,7 +5,7 @@ import os
 
 
 class Settings:
-    service_name: str = os.getenv("SERVICE_NAME", "customer-service")
+    service_name: str = os.getenv("SERVICE_NAME", "customer_service")
 
     # Use PostgreSQL, not SQLite
     database_url: str = os.getenv(

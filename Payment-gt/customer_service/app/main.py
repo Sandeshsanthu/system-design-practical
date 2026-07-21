@@ -264,7 +264,7 @@ async def confirm_payment_intent(
 
     headers = {
         "x-merchant-id": x_merchant_id,
-        "x-internal-service": "customer-service",
+        "x-internal-service": "customer_service",
         "idempotency-key": f"confirm:{session_row.session_id}",
     }
 

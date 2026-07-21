@@ -18,9 +18,6 @@ COPY schemas.py    .
 COPY channels/     channels/
 COPY templates/    templates/
 
-EXPOSE 8007
-
-HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
-  CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:8007/health')" || exit 1
-
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8007", "--log-level", "info"]
+ENV PORT=8008
+EXPOSE 8008
+CMD ["sh", "-c", "uvicorn main:app --host 0.0.0.0 --port ${PORT:-8008} --log-level info"]

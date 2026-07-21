@@ -6,7 +6,7 @@ from typing import Any
 from datetime import datetime
 
 
-# ── Inbound notify request (from payment-service) ────────────────────────────
+# ── Inbound notify request (from Payment) ────────────────────────────
 class NotifyRequest(BaseModel):
     event:       str
     payment_id:  str
