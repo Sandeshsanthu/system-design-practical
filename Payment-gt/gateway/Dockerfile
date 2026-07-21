@@ -3,7 +3,12 @@
 FROM python:3.12-slim
 WORKDIR /app
 ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1
+
+# Context is inside the gateway directory, so this file is found directly
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
-COPY api-gatway/app ./app
+
+# Stripped the incorrect 'api-gatway/' prefix to grab the local app directory
+COPY app ./app
+
 CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8080"]
