@@ -1,0 +1,32 @@
+# filename: test-app.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: payment-api-test
+  namespace: default
+  labels:
+    app: payment-api
+spec:
+  replicas: 5 # High replica count forces Karpenter to scale out a new node
+  selector:
+    matchLabels:
+      app: payment-api
+  template:
+    metadata:
+      labels:
+        app: payment-api
+    spec:
+      serviceAccountName: payment-api-sa # Connects the IRSA role for RDS secret access
+      containers:
+      - name: alpine-test
+        image: alpine:latest
+        command: ["sleep", "3600"]
+        resources:
+          requests:
+            cpu: "250m"      # Total requested: 1.25 Cores. Forces scale-out.
+            memory: "256Mi"  
+        env:
+        - name: AWS_REGION
+          value: "us-east-1"
+        # Simulated application entrypoint checking database secret access via AWS CLI/SDK
+        # In a real app, your code uses the native AWS SDK to query Secrets Manager
