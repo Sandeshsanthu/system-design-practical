@@ -30,7 +30,7 @@ resource "aws_secretsmanager_secret" "db_secret" {
 
 # 4. Inject the generated credentials securely into the Secrets Manager payload (Fixed naming)
 resource "aws_secretsmanager_secret_version" "db_secret_val" {
-  secret_id     = aws_secretsmanager_secret.db_secret.id
+  secret_id = aws_secretsmanager_secret.db_secret.id
   secret_string = jsonencode({
     username = var.db_username
     password = random_password.db_password.result
@@ -71,7 +71,7 @@ resource "aws_db_subnet_group" "rds_subnet_group" {
   description = "Restricts database instances to private isolated VPC subnets"
 
   tags = {
-    Name        = "${var.environment}-${var.cluster_name}-rds-subnet-group"
+    Name = "${var.environment}-${var.cluster_name}-rds-subnet-group"
   }
 }
 
@@ -91,9 +91,10 @@ resource "aws_db_instance" "postgres" {
   db_subnet_group_name   = aws_db_subnet_group.rds_subnet_group.name
   vpc_security_group_ids = [aws_security_group.rds_sg.id]
   publicly_accessible    = false
+  
 
-  skip_final_snapshot = var.environment == "production" ? false : true
-  deletion_protection = var.environment == "production" ? true : false
+  skip_final_snapshot = true
+  deletion_protection = false
 
   tags = {
     Environment = var.environment

@@ -12,7 +12,7 @@
 #     spec:
 #       # Pulls the IAM role name directly from your karpenter.tf module configurations
 #       role: ${module.karpenter.node_iam_role_name}
-      
+
 #       # Auto-discovers subnets and security groups using EKS tags
 #       subnetSelectorTerms:
 #         - tags:
@@ -20,10 +20,10 @@
 #       securityGroupSelectorTerms:
 #         - tags:
 #             karpenter.sh/discovery: ${local.name}
-            
+
 #       # Uses the lightweight Bottlerocket OS 
 #       amiFamily: Bottlerocket
-      
+
 #       # Configures cost-efficient root volumes
 #       blockDeviceMappings:
 #         - deviceName: /dev/xvda
@@ -31,7 +31,7 @@
 #             volumeSize: 30Gi
 #             volumeType: gp3
 #             encrypted: true
-      
+
 #       # Tracks node metrics safely
 #       monitoring: true
 #   YAML
@@ -68,12 +68,12 @@
 #             - key: karpenter.k8s.aws/instance-size
 #               operator: In
 #               values: ["small", "medium"]
-      
+
 #       # Safeguards to block massive automated billing overruns
 #       limits:
 #         cpu: 20
 #         memory: 80Gi
-        
+
 #       # Day-2 Consolidation rules for cleaning empty compute spaces
 #       disruption:
 #         consolidationPolicy: WhenEmptyOrUnderutilized

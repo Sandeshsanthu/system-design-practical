@@ -15,6 +15,6 @@ output "configure_kubectl" {
 output "aws_secret_name" {
   description = "The exact lookup string key your application pods must call in Secrets Manager"
   # Fixed the resource reference here by removing the underscores:
-  value       = aws_secretsmanager_secret.db_secret.name
+  value = aws_secretsmanager_secret.db_secret.name
 }
 
