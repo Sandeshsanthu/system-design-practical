@@ -20,18 +20,14 @@ provider "aws" {
   region = var.aws_region
 }
 
-# 1. Fetch cluster details dynamically (Always reads directly from the live AWS API)
-data "aws_eks_cluster" "current" {
-  name = module.eks.cluster_name
-}
+# 1. REMOVE or comment out the data sources entirely. 
+# They cause initialization race conditions when adding new resources.
 
-data "aws_eks_cluster_auth" "current" {
-  name = module.eks.cluster_name
-}
-# 2. Reference the cluster resource outputs directly (Assuming you use the official EKS module)
+# 2. Reference the module outputs directly.
+# This forces Terraform to read the existing infrastructure data straight from your state file.
 provider "kubernetes" {
-  host                   = data.aws_eks_cluster.current.endpoint
-  cluster_ca_certificate = base64decode(data.aws_eks_cluster.current.certificate_authority[0].data)
+  host                   = module.eks.cluster_endpoint
+  cluster_ca_certificate = base64decode(module.eks.cluster_certificate_authority_data)
 
   exec {
     api_version = "client.authentication.k8s.io/v1beta1"
@@ -44,5 +40,22 @@ provider "kubernetes" {
       "--cluster-name",
       module.eks.cluster_name
     ]
+  }
+}
+
+provider "helm" {
+  kubernetes {
+    host                   = module.eks.cluster_endpoint
+    cluster_ca_certificate = base64decode(module.eks.cluster_certificate_authority_data)
+
+    exec {
+      api_version = "client.authentication.k8s.io/v1beta1"
+      command     = "aws"
+      args = [
+        "eks", "get-token",
+        "--region", var.aws_region,
+        "--cluster-name", module.eks.cluster_name
+      ]
+    }
   }
 }
