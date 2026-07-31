@@ -5,17 +5,13 @@ resource "kubectl_manifest" "karpenter_node_class" {
   yaml_body = yamlencode({
     apiVersion = "karpenter.k8s.aws/v1"
     kind       = "EC2NodeClass"
-    metadata = {
-      name = "default"
-    }
+    metadata   = { name = "default" }
     spec = {
       amiSelectorTerms = [{ alias = "al2023@latest" }]
-
-      role = aws_iam_role.karpenter_node.name
+      role             = aws_iam_role.karpenter_node.name
 
       subnetSelectorTerms = [{
         tags = {
-          # ← FIX: was var.cluster_name ("core-eks")
           "kubernetes.io/cluster/${local.full_cluster_name}" = "shared"
           "kubernetes.io/role/internal-elb"                  = "1"
         }
@@ -23,55 +19,79 @@ resource "kubectl_manifest" "karpenter_node_class" {
 
       securityGroupSelectorTerms = [{
         tags = {
-          # ← already correct from previous fix
-          "kubernetes.io/cluster/${local.full_cluster_name}" = "owned"
+          "karpenter.sh/discovery" = local.full_cluster_name
         }
       }]
 
       tags = {
-        Environment = var.environment
-        Terraform   = "true"
+        Environment              = var.environment
+        Terraform                = "true"
+        "karpenter.sh/discovery" = local.full_cluster_name
       }
     }
   })
 
-  depends_on = [helm_release.karpenter]
+  depends_on = [
+    helm_release.karpenter,
+    time_sleep.wait_for_cluster
+  ]
 }
 
 resource "kubectl_manifest" "karpenter_node_pool" {
   yaml_body = yamlencode({
     apiVersion = "karpenter.sh/v1"
     kind       = "NodePool"
-    metadata = {
-      name = "default"
-    }
+    metadata   = { name = "default" }
     spec = {
       template = {
         spec = {
+          expireAfter  = "720h"
           nodeClassRef = {
             group = "karpenter.k8s.aws"
             kind  = "EC2NodeClass"
             name  = "default"
           }
           requirements = [
-            { key = "karpenter.sh/capacity-type",             operator = "In", values = ["spot", "on-demand"] },
-            { key = "kubernetes.io/arch",                     operator = "In", values = ["amd64"] },
-            { key = "karpenter.k8s.aws/instance-category",   operator = "In", values = ["t", "c", "m", "r"] },
-            { key = "karpenter.k8s.aws/instance-generation",  operator = "Gt", values = ["2"] }
+            # ✅ karpenter.sh domain — allowed
+            {
+              key      = "karpenter.sh/capacity-type"
+              operator = "In"
+              values   = ["spot", "on-demand"]
+            },
+            # ✅ kubernetes.io domain — allowed
+            {
+              key      = "kubernetes.io/arch"
+              operator = "In"
+              values   = ["amd64"]
+            },
+            # ✅ REPLACES karpenter.k8s.aws/instance-category (t,c,m,r gen>2)
+            #    node.kubernetes.io/instance-type is always allowed
+            {
+              key      = "node.kubernetes.io/instance-type"
+              operator = "In"
+              values   = [
+                "t3.medium", "t3.large", "t3.xlarge", "t3.2xlarge",
+                "m5.large",  "m5.xlarge", "m5.2xlarge", "m5.4xlarge",
+                "m6i.large", "m6i.xlarge", "m6i.2xlarge",
+                "c5.large",  "c5.xlarge", "c5.2xlarge", "c5.4xlarge",
+                "c6i.large", "c6i.xlarge", "c6i.2xlarge",
+                "r5.large",  "r5.xlarge", "r5.2xlarge",
+                "r6i.large", "r6i.xlarge", "r6i.2xlarge"
+              ]
+            }
           ]
         }
       }
-      limits = {
-        cpu    = "100"
-        memory = "400Gi"
-      }
+
+      limits = { cpu = "100", memory = "400Gi" }
+
       disruption = {
         consolidationPolicy = "WhenEmptyOrUnderutilized"
         consolidateAfter    = "30s"
+        budgets             = [{ nodes = "10%" }]
       }
     }
   })
 
   depends_on = [kubectl_manifest.karpenter_node_class]
 }
-

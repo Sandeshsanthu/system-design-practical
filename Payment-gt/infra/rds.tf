@@ -79,7 +79,7 @@ resource "aws_db_subnet_group" "rds_subnet_group" {
 resource "aws_db_instance" "postgres" {
   identifier        = "${var.environment}-payment-db"
   engine            = "postgres"
-  engine_version    = "16.3"
+  engine_version    = "16"
   instance_class    = "db.t3.micro" # AWS Free Tier Eligible
   allocated_storage = 20            # AWS Free Tier Eligible
   storage_type      = "gp3"

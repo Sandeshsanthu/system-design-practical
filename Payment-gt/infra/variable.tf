@@ -1,6 +1,6 @@
 variable "aws_region" {
   type    = string
-  default = "us-east-1"
+  default = "us-east-2"
 }
 
 variable "environment" {
@@ -20,7 +20,7 @@ variable "vpc_cidr" {
 
 variable "instance_types" {
   type    = list(string)
-  default = ["t3.small", "t3.micro"] # Combines highly affordable low-tier architectures
+  default = ["t3.small", "t3.medium"] # Combines highly affordable low-tier architectures
 }
 
 variable "db_username" {
