@@ -52,38 +52,26 @@ resource "kubectl_manifest" "karpenter_node_pool" {
             name  = "default"
           }
           requirements = [
-            # ✅ karpenter.sh domain — allowed
             {
               key      = "karpenter.sh/capacity-type"
               operator = "In"
-              values   = ["spot", "on-demand"]
+              values   = ["on-demand"]       # ✅ spot not available on Free Tier micro types
             },
-            # ✅ kubernetes.io domain — allowed
             {
               key      = "kubernetes.io/arch"
               operator = "In"
               values   = ["amd64"]
             },
-            # ✅ REPLACES karpenter.k8s.aws/instance-category (t,c,m,r gen>2)
-            #    node.kubernetes.io/instance-type is always allowed
             {
               key      = "node.kubernetes.io/instance-type"
               operator = "In"
-              values   = [
-                "t3.medium", "t3.large", "t3.xlarge", "t3.2xlarge",
-                "m5.large",  "m5.xlarge", "m5.2xlarge", "m5.4xlarge",
-                "m6i.large", "m6i.xlarge", "m6i.2xlarge",
-                "c5.large",  "c5.xlarge", "c5.2xlarge", "c5.4xlarge",
-                "c6i.large", "c6i.xlarge", "c6i.2xlarge",
-                "r5.large",  "r5.xlarge", "r5.2xlarge",
-                "r6i.large", "r6i.xlarge", "r6i.2xlarge"
-              ]
+              values   = ["t2.micro", "t3.micro"]   # ✅ Free Tier eligible only
             }
           ]
         }
       }
 
-      limits = { cpu = "100", memory = "400Gi" }
+      limits = { cpu = "10", memory = "10Gi" }   # ✅ Reduced — matches micro capacity realistically
 
       disruption = {
         consolidationPolicy = "WhenEmptyOrUnderutilized"
@@ -95,3 +83,4 @@ resource "kubectl_manifest" "karpenter_node_pool" {
 
   depends_on = [kubectl_manifest.karpenter_node_class]
 }
+
