@@ -2,7 +2,9 @@
 # filename: bank_connector/app/services/idempotency.py
 
 import logging
+
 from sqlalchemy.orm import Session
+
 from bank_connector.app.models.transaction import ProcessorTransaction
 
 logger = logging.getLogger(__name__)

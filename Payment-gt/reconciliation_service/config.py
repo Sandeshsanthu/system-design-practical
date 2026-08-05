@@ -10,12 +10,12 @@ MERCHANT = os.getenv("MERCHANT_URL",     "http://merchant-service:8001")
 NOTIF    = os.getenv("NOTIFICATION_URL", "http://notification-service:8008")
 
 SECRET_KEY = os.getenv("SECRET_KEY", "sk_test_123")
-PORT       = int(os.getenv("PORT", 8009))
+PORT       = int(os.getenv("PORT", "8009"))
 
-EOD_HOUR     = int(os.getenv("EOD_HOUR",     23))
-EOD_MINUTE   = int(os.getenv("EOD_MINUTE",   0))
+EOD_HOUR     = int(os.getenv("EOD_HOUR", "23"))
+EOD_MINUTE   = int(os.getenv("EOD_MINUTE", "0"))
 EOD_TIMEZONE = os.getenv("EOD_TIMEZONE",     "America/New_York")
-RECON_LIMIT  = int(os.getenv("RECON_LIMIT",  500))
+RECON_LIMIT  = int(os.getenv("RECON_LIMIT", "500"))
 
 # Ordered list of payment-list endpoints to try — first 200 wins
 PAYMENT_LIST_URLS = [

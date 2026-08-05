@@ -6,9 +6,10 @@ import time
 
 import httpx
 import jwt
+from app.config import settings
 from fastapi import HTTPException, Request
 from jwt import algorithms
-from app.config import settings
+
 
 class JwksCache:
     def __init__(self):

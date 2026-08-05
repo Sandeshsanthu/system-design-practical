@@ -3,18 +3,12 @@
 
 import base64
 import time
-
-import jwt
-
 from uuid import uuid4
 
+import jwt
 from cryptography.hazmat.primitives.asymmetric import rsa
-
 from fastapi import FastAPI
-
 from pydantic import BaseModel
-
-
 
 app = FastAPI(title="auth_service")
 

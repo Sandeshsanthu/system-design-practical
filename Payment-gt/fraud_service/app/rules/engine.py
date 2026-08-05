@@ -2,12 +2,13 @@
 # filename: fraud_service/app/rules/engine.py
 
 from sqlalchemy.orm import Session
+
 from fraud_service.app.models.fraud import FraudCheck
-from fraud_service.app.schemas.fraud import FraudCheckRequest, RuleResult
-from fraud_service.app.rules.velocity import VelocityRules
+from fraud_service.app.rules.amount_rules import AmountRules
 from fraud_service.app.rules.blocklist import BlocklistRules
 from fraud_service.app.rules.card_rules import CardRules
-from fraud_service.app.rules.amount_rules import AmountRules
+from fraud_service.app.rules.velocity import VelocityRules
+from fraud_service.app.schemas.fraud import FraudCheckRequest, RuleResult
 
 
 class FraudRulesEngine:

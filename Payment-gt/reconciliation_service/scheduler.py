@@ -2,12 +2,13 @@
 # filename: reconciliation_service/scheduler.py
 
 import logging
-import httpx
-from datetime import datetime
-from apscheduler.schedulers.asyncio import AsyncIOScheduler
-from apscheduler.triggers.cron     import CronTrigger
-from models import ReconcileRequest, ScheduleConfig, TriggerType
+from datetime import datetime, timezone
+
 import config
+import httpx
+from apscheduler.schedulers.asyncio import AsyncIOScheduler
+from apscheduler.triggers.cron import CronTrigger
+from models import ReconcileRequest, ScheduleConfig, TriggerType
 
 logger = logging.getLogger("scheduler")
 
@@ -97,10 +98,10 @@ class ReconciliationScheduler:
 
     async def _run_eod(self):
         import uuid
-        run_id = f"recon_eod_{datetime.utcnow().strftime('%Y%m%d_%H%M%S')}_{uuid.uuid4().hex[:6]}"
+        run_id = f"recon_eod_{datetime.now(tz=timezone.utc).strftime('%Y%m%d_%H%M%S')}_{uuid.uuid4().hex[:6]}"
         logger.info(f"EOD reconciliation started — run_id={run_id}")
         self.total_scheduled_runs += 1
-        self.last_run_at = str(datetime.utcnow())
+        self.last_run_at = str(datetime.now(tz=timezone.utc))
 
         req = ReconcileRequest(limit=self.cfg.limit)
         await self.reconciler.run(run_id, req, trigger=TriggerType.SCHEDULED)
@@ -142,5 +143,5 @@ class ReconciliationScheduler:
             async with httpx.AsyncClient(timeout=5) as client:
                 await client.post(f"{config.NOTIFY}/notify", json=payload)
             logger.info(f"EOD notification sent for run {run_id}")
-        except Exception as e:
+        except Exception as e: # noqa: BLE001
             logger.warning(f"EOD notification failed: {e}")

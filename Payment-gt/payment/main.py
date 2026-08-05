@@ -3,12 +3,11 @@ import logging
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
-from sqlalchemy import text
-
 from Payment.api.endpoints import router as payment_router
-from Payment.config.database import Base, DATABASE_URL, SessionLocal, engine
+from Payment.config.database import DATABASE_URL, Base, SessionLocal, engine
 from Payment.models import payment  # noqa: F401
 from Payment.search import initialize_search, shutdown_search
+from sqlalchemy import text
 
 logger = logging.getLogger(__name__)
 
@@ -20,7 +19,7 @@ async def lifespan(app: FastAPI):
     try:
         db_host = DATABASE_URL.split("@")[1] if "@" in DATABASE_URL else "local"
         logger.info("Target Database Host: %s", db_host)
-    except Exception:
+    except Exception: # noqa: BLE001
         logger.info("Target Database Host: Configured via environment string")
 
     db = SessionLocal()

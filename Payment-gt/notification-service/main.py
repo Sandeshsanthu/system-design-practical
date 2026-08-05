@@ -5,12 +5,11 @@ import logging
 import sys
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
-from fastapi.middleware.cors import CORSMiddleware
-
 from config import get_settings
 from database import init_db
 from endpoints import router
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 
 settings = get_settings()
 

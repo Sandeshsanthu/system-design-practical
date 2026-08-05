@@ -2,7 +2,9 @@
 # filename: api-gatway/app/rate_limit.py
 import time
 import uuid
+
 from fastapi import HTTPException
+
 LUA = """
 redis.call('ZREMRANGEBYSCORE', KEYS[1], 0, ARGV[1]-ARGV[2])
 redis.call('ZADD', KEYS[1], ARGV[1], ARGV[4])

@@ -2,7 +2,9 @@
 # filename: bank_connector/app/models/transaction.py
 
 from datetime import datetime
-from sqlalchemy import Boolean, Column, DateTime, Integer, JSON, String, Text
+
+from sqlalchemy import JSON, Boolean, Column, DateTime, Integer, String, Text
+
 from bank_connector.app.db import Base
 
 

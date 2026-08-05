@@ -8,8 +8,8 @@ Revises: <replace_with_your_last_revision_id>
 Create Date: 2025-01-01 00:00:00
 """
 
-from alembic import op
 import sqlalchemy as sa
+from alembic import op
 
 # ── Revision identifiers ───────────────────────────────────────────────────
 revision      = 'b3f1a2c9d4e7'

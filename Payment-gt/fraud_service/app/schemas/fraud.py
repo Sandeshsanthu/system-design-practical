@@ -3,7 +3,7 @@
 
 from datetime import datetime
 from enum import Enum
-from typing import Optional
+
 from pydantic import BaseModel
 
 
@@ -25,8 +25,8 @@ class CardData(BaseModel):
 class CustomerData(BaseModel):
     id: str
     email: str
-    ip_address: Optional[str] = None
-    user_agent: Optional[str] = None
+    ip_address: str | None = None
+    user_agent: str | None = None
 
 
 class FraudCheckRequest(BaseModel):
@@ -36,14 +36,14 @@ class FraudCheckRequest(BaseModel):
     currency: str
     card: CardData
     customer: CustomerData
-    metadata: Optional[dict] = None
+    metadata: dict | None = None
 
 
 class RuleResult(BaseModel):
     rule_name: str
     triggered: bool
     score_impact: int
-    reason: Optional[str] = None
+    reason: str | None = None
 
 
 class FraudCheckResponse(BaseModel):
@@ -56,7 +56,7 @@ class FraudCheckResponse(BaseModel):
     triggered_rules: list[RuleResult]
     recommendation: str
     review_required: bool
-    block_reason: Optional[str] = None
+    block_reason: str | None = None
 
 
 class BlocklistAddRequest(BaseModel):
@@ -64,7 +64,7 @@ class BlocklistAddRequest(BaseModel):
     value: str
     reason: str
     added_by: str
-    expires_at: Optional[datetime] = None
+    expires_at: datetime | None = None
 
 
 class ConfirmFraudRequest(BaseModel):

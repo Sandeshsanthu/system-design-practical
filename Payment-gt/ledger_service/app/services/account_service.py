@@ -19,7 +19,7 @@ def get_or_create_account(
     owner_type: str,
     account_type: str,
     currency: str = "usd",
-    description: str = None,
+    description: str | None = None,
 ) -> Account:
     """
     Get existing account or create new one.
@@ -34,9 +34,9 @@ def get_or_create_account(
             owner_type=owner_type,
             account_type=account_type,
             currency=currency,
-            balance=Decimal("0"),
-            available_balance=Decimal("0"),
-            pending_balance=Decimal("0"),
+            balance=Decimal(0),
+            available_balance=Decimal(0),
+            pending_balance=Decimal(0),
             description=description,
         )
         db.add(account)
@@ -95,9 +95,9 @@ def ensure_system_accounts(db: Session):
                 owner_type=acct["owner_type"],
                 account_type=acct["account_type"],
                 currency="usd",
-                balance=Decimal("0"),
-                available_balance=Decimal("0"),
-                pending_balance=Decimal("0"),
+                balance=Decimal(0),
+                available_balance=Decimal(0),
+                pending_balance=Decimal(0),
                 description=acct["description"],
             ))
             logger.info(f"Created system account: {acct['id']}")

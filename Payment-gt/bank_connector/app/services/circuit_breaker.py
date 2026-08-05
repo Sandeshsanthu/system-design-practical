@@ -2,7 +2,7 @@
 # filename: bank_connector/app/services/circuit_breaker.py
 
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from enum import Enum
 
 logger = logging.getLogger(__name__)
@@ -52,17 +52,14 @@ class CircuitBreaker:
 
         if self.state == CircuitState.OPEN:
             # Check if timeout has passed
-            if self.opened_at and datetime.utcnow() > self.opened_at + timedelta(seconds=self.timeout_seconds):
+            if self.opened_at and datetime.now(tz=timezone.utc) > self.opened_at + timedelta(seconds=self.timeout_seconds):
                 logger.info(f"Circuit {self.processor}: OPEN → HALF_OPEN (testing)")
                 self.state = CircuitState.HALF_OPEN
                 return True
             logger.warning(f"Circuit {self.processor}: OPEN - blocking request")
             return False
 
-        if self.state == CircuitState.HALF_OPEN:
-            return True
-
-        return False
+        return self.state == CircuitState.HALF_OPEN
 
     def record_success(self):
         """Call when processor returns success"""
@@ -77,12 +74,12 @@ class CircuitBreaker:
     def record_failure(self):
         """Call when processor returns failure"""
         self.failure_count += 1
-        self.last_failure_time = datetime.utcnow()
+        self.last_failure_time = datetime.now(tz=timezone.utc)
 
         if self.state == CircuitState.HALF_OPEN:
             logger.warning(f"Circuit {self.processor}: HALF_OPEN → OPEN (still failing)")
             self.state = CircuitState.OPEN
-            self.opened_at = datetime.utcnow()
+            self.opened_at = datetime.now(tz=timezone.utc)
             return
 
         if self.failure_count >= self.failure_threshold:
@@ -91,7 +88,7 @@ class CircuitBreaker:
                 f"({self.failure_count} failures)"
             )
             self.state = CircuitState.OPEN
-            self.opened_at = datetime.utcnow()
+            self.opened_at = datetime.now(tz=timezone.utc)
 
     def get_status(self) -> dict:
         return {

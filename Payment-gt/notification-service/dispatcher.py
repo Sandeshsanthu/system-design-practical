@@ -4,11 +4,10 @@
 import logging
 from datetime import datetime, timezone
 
-from sqlalchemy.ext.asyncio import AsyncSession
-
 from channels import EmailChannel, SMSChannel, WebhookChannel
-from models import Notification, DeliveryStatus
-from schemas import NotifyRequest, DispatchResult
+from models import DeliveryStatus, Notification
+from schemas import DispatchResult, NotifyRequest
+from sqlalchemy.ext.asyncio import AsyncSession
 
 logger = logging.getLogger(__name__)
 

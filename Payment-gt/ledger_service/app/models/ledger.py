@@ -4,8 +4,14 @@
 from datetime import datetime
 
 from sqlalchemy import (
-    Boolean, Column, DateTime,
-    JSON, Numeric, String, UniqueConstraint, Index
+    JSON,
+    Boolean,
+    Column,
+    DateTime,
+    Index,
+    Numeric,
+    String,
+    UniqueConstraint,
 )
 
 from ledger_service.app.db import Base

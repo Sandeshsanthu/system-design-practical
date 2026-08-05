@@ -4,7 +4,7 @@
 from datetime import datetime
 from decimal import Decimal
 from enum import Enum
-from typing import Optional
+
 from pydantic import BaseModel
 
 
@@ -29,8 +29,8 @@ class RecordAuthorizationRequest(BaseModel):
     merchant_id: str
     amount:      int       # cents
     currency:    str = "usd"
-    description: Optional[str] = None
-    metadata:    Optional[dict] = None
+    description: str | None = None
+    metadata:    dict | None = None
 
 
 class RecordCaptureRequest(BaseModel):
@@ -38,9 +38,9 @@ class RecordCaptureRequest(BaseModel):
     merchant_id:     str
     amount:          int
     currency:        str = "usd"
-    platform_fee:    Optional[int] = None   # None = auto-calculate
-    description:     Optional[str] = None
-    metadata:        Optional[dict] = None
+    platform_fee:    int | None = None   # None = auto-calculate
+    description:     str | None = None
+    metadata:        dict | None = None
 
 
 class RecordRefundRequest(BaseModel):
@@ -48,8 +48,8 @@ class RecordRefundRequest(BaseModel):
     merchant_id: str
     amount:      int
     currency:    str = "usd"
-    reason:      Optional[str] = None
-    metadata:    Optional[dict] = None
+    reason:      str | None = None
+    metadata:    dict | None = None
 
 
 class RecordVoidRequest(BaseModel):
@@ -57,7 +57,7 @@ class RecordVoidRequest(BaseModel):
     merchant_id: str
     amount:      int
     currency:    str = "usd"
-    metadata:    Optional[dict] = None
+    metadata:    dict | None = None
 
 
 # ── Response Schemas ─────────────────────────────────────────────────────────
@@ -71,7 +71,7 @@ class AccountResponse(BaseModel):
     balance:           Decimal
     available_balance: Decimal
     pending_balance:   Decimal
-    description:       Optional[str]
+    description:       str | None
     created_at:        datetime
     updated_at:        datetime
 
@@ -90,7 +90,7 @@ class LedgerEntryResponse(BaseModel):
     amount:         Decimal
     currency:       str
     balance_after:  Decimal
-    description:    Optional[str]
+    description:    str | None
     created_at:     datetime
 
     class Config:
@@ -105,7 +105,7 @@ class LedgerTransactionResponse(BaseModel):
     amount:      Decimal
     currency:    str
     status:      str
-    description: Optional[str]
+    description: str | None
     entries:     list[LedgerEntryResponse] = []
     created_at:  datetime
 

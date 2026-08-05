@@ -138,7 +138,7 @@ async def wait_for_es(
         try:
             if await es.ping():
                 return
-        except Exception as exc:
+        except Exception as exc: # noqa: BLE001
             last_error = exc
 
         await asyncio.sleep(1)

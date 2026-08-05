@@ -3,6 +3,7 @@
 
 import logging
 import os
+
 import httpx
 
 logger = logging.getLogger(__name__)
@@ -56,6 +57,6 @@ async def notify_event(
                 return True
             logger.warning("[NOTIFY] ✗ HTTP %d event=%s", resp.status_code, event)
             return False
-    except Exception as exc:
+    except Exception as exc: # noqa: BLE001
         logger.error("[NOTIFY] ✗ unreachable event=%s error=%s", event, exc)
         return False

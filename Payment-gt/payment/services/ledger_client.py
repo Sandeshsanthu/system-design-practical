@@ -3,6 +3,7 @@
 
 import logging
 import os
+
 import httpx
 
 logger = logging.getLogger(__name__)
@@ -31,7 +32,7 @@ async def notify_authorization(
                 },
             )
             return response.status_code == 200
-    except Exception as e:
+    except Exception as e: # noqa: BLE001
         logger.warning(f"Ledger authorization notification failed: {e}")
         return False
 
@@ -54,7 +55,7 @@ async def notify_capture(
                 },
             )
             return response.status_code == 200
-    except Exception as e:
+    except Exception as e: # noqa: BLE001
         logger.warning(f"Ledger capture notification failed: {e}")
         return False
 
@@ -64,7 +65,7 @@ async def notify_refund(
     merchant_id: str,
     amount: int,
     currency: str = "usd",
-    reason: str = None,
+    reason: str | None = None,
 ) -> bool:
     try:
         async with httpx.AsyncClient(timeout=10.0) as client:
@@ -79,7 +80,7 @@ async def notify_refund(
                 },
             )
             return response.status_code == 200
-    except Exception as e:
+    except Exception as e: # noqa: BLE001
         logger.warning(f"Ledger refund notification failed: {e}")
         return False
 
@@ -102,6 +103,6 @@ async def notify_void(
                 },
             )
             return response.status_code == 200
-    except Exception as e:
+    except Exception as e: # noqa: BLE001
         logger.warning(f"Ledger void notification failed: {e}")
         return False

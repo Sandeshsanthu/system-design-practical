@@ -2,13 +2,12 @@
 # filename: Payment/services/transaction_service.py
 
 import uuid
-from datetime import datetime
-from typing import Any, Dict, Optional
+from datetime import datetime, timezone
+from typing import Any
 
-from sqlalchemy.orm import Session
-
-from Payment.models.payment import Transaction
 from Payment.models.enums import TransactionType
+from Payment.models.payment import Transaction
+from sqlalchemy.orm import Session
 
 
 def log_transaction(
@@ -18,10 +17,10 @@ def log_transaction(
     amount: int,
     currency: str,
     status: str,
-    bank_reference: Optional[str] = None,
-    failure_code: Optional[str] = None,
-    failure_message: Optional[str] = None,
-    metadata: Optional[Dict[str, Any]] = None,
+    bank_reference: str | None = None,
+    failure_code: str | None = None,
+    failure_message: str | None = None,
+    metadata: dict[str, Any] | None = None,
 ) -> Transaction:
     transaction = Transaction(
         id=f"txn_{uuid.uuid4().hex}",
@@ -34,7 +33,7 @@ def log_transaction(
         failure_code=failure_code,
         failure_message=failure_message,
         metadata_json=metadata or {},
-        created_at=datetime.utcnow(),
+        created_at=datetime.now(tz=timezone.utc),
     )
     db.add(transaction)
     return transaction

@@ -2,6 +2,7 @@
 # filename: bank_connector/app/processors/base.py
 
 from abc import ABC, abstractmethod
+
 from bank_connector.app.schemas.connector import (
     AuthorizeRequest,
     CaptureRequest,

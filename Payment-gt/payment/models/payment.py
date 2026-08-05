@@ -3,10 +3,9 @@
 
 from datetime import datetime
 
-from sqlalchemy import JSON, Column, DateTime, Index, Integer, String
-
 from Payment.config.database import Base
 from Payment.models.enums import PaymentStatus
+from sqlalchemy import JSON, Column, DateTime, Index, Integer, String
 
 
 class Payment(Base):

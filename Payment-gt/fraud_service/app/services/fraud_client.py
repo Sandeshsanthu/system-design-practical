@@ -4,6 +4,7 @@
 import hashlib
 import logging
 import os
+
 import httpx
 
 logger = logging.getLogger(__name__)
@@ -22,8 +23,8 @@ async def check_fraud(
     card,
     customer_id: str,
     customer_email: str,
-    ip_address: str = None,
-    user_agent: str = None,
+    ip_address: str | None = None,
+    user_agent: str | None = None,
     http_client: httpx.AsyncClient = None,
 ) -> dict:
     """
@@ -55,6 +56,6 @@ async def check_fraud(
         client = http_client or httpx.AsyncClient(timeout=5.0)
         response = await client.post(f"{FRAUD_SERVICE_URL}/check", json=payload)
         return response.json()
-    except Exception as e:
+    except Exception as e: # noqa: BLE001
         logger.warning(f"Fraud service unavailable: {e} - failing open")
         return {"allowed": True, "risk_score": 0, "risk_level": "low", "block_reason": None}

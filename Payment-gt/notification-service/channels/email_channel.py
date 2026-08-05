@@ -71,7 +71,7 @@ class EmailChannel:
                 if resp.status_code in (200, 202):
                     return True, None
                 return False, f"SendGrid HTTP {resp.status_code}: {resp.text}"
-        except Exception as exc:
+        except Exception as exc: # noqa: BLE001
             return False, str(exc)
 
     # ── SMTP fallback ─────────────────────────────────────────────────────────
@@ -87,5 +87,5 @@ class EmailChannel:
             with smtplib.SMTP("localhost", 25, timeout=10) as server:
                 server.sendmail(settings.SENDGRID_FROM_EMAIL, [recipient], msg.as_string())
             return True, None
-        except Exception as exc:
+        except Exception as exc: # noqa: BLE001
             return False, str(exc)

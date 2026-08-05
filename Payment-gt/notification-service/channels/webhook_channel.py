@@ -7,14 +7,13 @@ import hmac
 import json
 import logging
 import time
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timedelta, timezone
 
 import httpx
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
-
 from config import get_settings
-from models import MerchantWebhook, WebhookDelivery, DeliveryStatus
+from models import DeliveryStatus, MerchantWebhook, WebhookDelivery
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 logger = logging.getLogger(__name__)
 settings = get_settings()
@@ -40,7 +39,7 @@ class WebhookChannel:
         result = await db.execute(
             select(MerchantWebhook).where(
                 MerchantWebhook.merchant_id == merchant_id,
-                MerchantWebhook.is_active   == True,   # noqa: E712
+                MerchantWebhook.is_active   == True,
             )
         )
         webhooks = result.scalars().all()
@@ -104,15 +103,15 @@ class WebhookChannel:
                     try:
                         await db.commit()
                     except Exception:
-                        pass
-                    await asyncio.sleep(delay)
+                        logger.warning("DB commit failed during webhook retry, continuing", exc_info=True)
+                        await asyncio.sleep(delay)
                 else:
                     delivery.status = DeliveryStatus.FAILED
                     logger.error("[WEBHOOK] ✗ all attempts exhausted event=%s wh=%s", delivery.event, webhook.id)
 
         try:
             await db.commit()
-        except Exception as exc:
+        except Exception as exc: # noqa: BLE001
             logger.error("Webhook delivery DB commit failed: %s", exc)
 
     async def _post(
@@ -136,5 +135,5 @@ class WebhookChannel:
                 return success, resp.status_code, resp.text, None if success else f"HTTP {resp.status_code}"
         except httpx.TimeoutException:
             return False, None, None, "Request timed out"
-        except Exception as exc:
+        except Exception as exc: # noqa: BLE001
             return False, None, None, str(exc)

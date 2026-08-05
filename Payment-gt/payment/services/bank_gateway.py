@@ -4,12 +4,11 @@
 import asyncio
 import random
 import uuid
-from typing import Dict
 
 from Payment.schemas.payment import CardInfo
 
 
-async def call_bank_authorize(payment_id: str, amount: int, card: CardInfo) -> Dict:
+async def call_bank_authorize(payment_id: str, amount: int, card: CardInfo) -> dict:
     await asyncio.sleep(0.5)
 
     if random.random() < 0.9:
@@ -26,7 +25,7 @@ async def call_bank_authorize(payment_id: str, amount: int, card: CardInfo) -> D
     }
 
 
-async def call_bank_capture(payment_id: str, authorization_code: str, amount: int) -> Dict:
+async def call_bank_capture(payment_id: str, authorization_code: str, amount: int) -> dict:
     await asyncio.sleep(0.3)
     return {
         "success": True,
@@ -35,7 +34,7 @@ async def call_bank_capture(payment_id: str, authorization_code: str, amount: in
     }
 
 
-async def call_bank_void(payment_id: str, authorization_code: str) -> Dict:
+async def call_bank_void(payment_id: str, authorization_code: str) -> dict:
     await asyncio.sleep(0.3)
     return {
         "success": True,
@@ -44,7 +43,7 @@ async def call_bank_void(payment_id: str, authorization_code: str) -> Dict:
     }
 
 
-async def call_bank_refund(payment_id: str, amount: int) -> Dict:
+async def call_bank_refund(payment_id: str, amount: int) -> dict:
     await asyncio.sleep(0.3)
     return {
         "success": True,

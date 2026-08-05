@@ -3,15 +3,18 @@
 
 import asyncio
 import logging
-from datetime import datetime
-from typing import Dict, List, Optional
-
-import httpx
+from datetime import datetime, timezone
 
 import config
+import httpx
 from models import (
-    Discrepancy, DiscrepancyType, Severity,
-    PaymentRecord, ReconcileRequest, ReconcileResult, TriggerType
+    Discrepancy,
+    DiscrepancyType,
+    PaymentRecord,
+    ReconcileRequest,
+    ReconcileResult,
+    Severity,
+    TriggerType,
 )
 
 logger = logging.getLogger("reconciler")
@@ -22,8 +25,8 @@ MR_HEADERS = {"Authorization": f"Bearer {config.SECRET_KEY}"}
 
 class Reconciler:
     def __init__(self):
-        self.results           : Dict[str, ReconcileResult] = {}
-        self.all_discrepancies : List[Discrepancy]          = []
+        self.results           : dict[str, ReconcileResult] = {}
+        self.all_discrepancies : list[Discrepancy]          = []
 
     # ── Public API ─────────────────────────────────────────────────────────────
 
@@ -37,7 +40,7 @@ class Reconciler:
             run_id     = run_id,
             trigger    = trigger,
             status     = "running",
-            started_at = datetime.utcnow(),
+            started_at = datetime.now(tz=timezone.utc),
         )
         self.results[run_id] = result
 
@@ -55,7 +58,7 @@ class Reconciler:
                     self.all_discrepancies.extend(record.discrepancies)
 
             result.status       = "completed"
-            result.completed_at = datetime.utcnow()
+            result.completed_at = datetime.now(tz=timezone.utc)
             result.summary      = self._build_summary(result)
             logger.info(
                 f"Run {run_id} complete — trigger={trigger} "
@@ -63,9 +66,9 @@ class Reconciler:
             )
 
         except Exception as e:
-            logger.exception(f"Run {run_id} failed: {e}")
+            logger.exception("Run %s failed", run_id)
             result.status       = "failed"
-            result.completed_at = datetime.utcnow()
+            result.completed_at = datetime.now(tz=timezone.utc)
             result.summary      = {"error": str(e)}
 
         self.results[run_id] = result
@@ -73,7 +76,7 @@ class Reconciler:
     def reconcile_single(self, payment_id: str) -> dict:
         return asyncio.run(self._single_sync(payment_id))
 
-    def get_all_results(self) -> List[ReconcileResult]:
+    def get_all_results(self) -> list[ReconcileResult]:
         return list(self.results.values())
 
     def get_result(self, run_id: str):
@@ -81,9 +84,9 @@ class Reconciler:
 
     def get_discrepancies(
         self,
-        severity : Optional[str] = None,
-        layer    : Optional[str] = None,
-    ) -> List[Discrepancy]:
+        severity : str | None = None,
+        layer    : str | None = None,
+    ) -> list[Discrepancy]:
         out = self.all_discrepancies
         if severity:
             out = [d for d in out if d.severity.upper() == severity.upper()]
@@ -109,14 +112,14 @@ class Reconciler:
 
     # ── Payment fetching (with multi-endpoint discovery) ──────────────────────
 
-    async def _fetch_payments(self, req: ReconcileRequest) -> List[dict]:
+    async def _fetch_payments(self, req: ReconcileRequest) -> list[dict]:
         """Entry point — routes to ID resolution or list fetch."""
         async with httpx.AsyncClient(timeout=10) as client:
             if req.payment_ids:
                 return await self._resolve_ids(client, req.payment_ids)
             return await self._list_payments(client, req.limit)
 
-    async def _list_payments(self, client: httpx.AsyncClient, limit: int) -> List[dict]:
+    async def _list_payments(self, client: httpx.AsyncClient, limit: int) -> list[dict]:
         """
         Try each URL in config.PAYMENT_LIST_URLS until one returns data.
         Handles three shapes:
@@ -168,7 +171,7 @@ class Reconciler:
                         out.append(p)
                 return out
 
-            except Exception as e:
+            except Exception as e: # noqa: BLE001
                 logger.debug(f"List {url} error: {e}, skipping")
 
         raise RuntimeError(
@@ -177,8 +180,8 @@ class Reconciler:
         )
 
     async def _resolve_ids(
-        self, client: httpx.AsyncClient, ids: List[str]
-    ) -> List[dict]:
+        self, client: httpx.AsyncClient, ids: list[str]
+    ) -> list[dict]:
         """Fetch full payment objects for a list of IDs via config.PAYMENT_DETAIL_URLS."""
         results = []
         for pid in ids:
@@ -195,7 +198,8 @@ class Reconciler:
                             results.append(obj)
                             resolved = True
                             break
-                except Exception:
+                except Exception: # noqa: BLE001
+                    logger.debug("Detail endpoint failed for payment %s, trying next", pid)
                     continue
             if not resolved:
                 logger.warning(f"Could not resolve payment {pid} from any detail endpoint")
@@ -256,7 +260,7 @@ class Reconciler:
                     "LEDGER", "HTTP 200", f"HTTP {resp.status_code}",
                     f"Ledger returned {resp.status_code} for {r.payment_id}",
                 ))
-        except Exception as e:
+        except Exception as e: # noqa: BLE001
             r.discrepancies.append(self._disc(
                 r.payment_id, DiscrepancyType.MISSING_LEDGER_ENTRY, Severity.HIGH,
                 "LEDGER", "reachable", "ERROR", f"Ledger error: {e}",
@@ -281,7 +285,7 @@ class Reconciler:
                     "BANK", "bank_transaction", "NOT_FOUND",
                     f"Captured payment {r.payment_id} has no bank record",
                 ))
-        except Exception as e:
+        except Exception as e: # noqa: BLE001
             logger.debug(f"Bank check skipped for {r.payment_id}: {e}")
 
     async def _check_merchant(self, client: httpx.AsyncClient, r: PaymentRecord):
@@ -306,7 +310,7 @@ class Reconciler:
                     "MERCHANT", "merchant_record", "NOT_FOUND",
                     f"Payment {r.payment_id} not visible on merchant service",
                 ))
-        except Exception as e:
+        except Exception as e: # noqa: BLE001
             logger.debug(f"Merchant check skipped for {r.payment_id}: {e}")
 
     async def _single_sync(self, payment_id: str) -> dict:
@@ -329,7 +333,7 @@ class Reconciler:
             expected    = expected,
             actual      = actual,
             message     = message,
-            detected_at = datetime.utcnow(),
+            detected_at = datetime.now(tz=timezone.utc),
         )
 
     @staticmethod

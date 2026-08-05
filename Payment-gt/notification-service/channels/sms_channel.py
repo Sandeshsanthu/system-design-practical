@@ -2,6 +2,7 @@
 # filename: notification-service/channels/sms_channel.py
 
 import logging
+
 import httpx
 from config import get_settings
 
@@ -67,5 +68,5 @@ class SMSChannel:
                 if resp.status_code == 201:
                     return True, None
                 return False, f"Twilio error: {data.get('message', resp.text)}"
-        except Exception as exc:
+        except Exception as exc: # noqa: BLE001
             return False, str(exc)

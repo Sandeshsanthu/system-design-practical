@@ -2,6 +2,7 @@
 # filename: bank_connector/app/processors/router.py
 
 import logging
+
 from bank_connector.app.processors.base import BaseProcessor
 from bank_connector.app.processors.stripe_processor import StripeProcessor
 from bank_connector.app.schemas.connector import AuthorizeRequest

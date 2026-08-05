@@ -1,12 +1,13 @@
 # filename: api-gatway/app/main.py
 from contextlib import asynccontextmanager
+
 import httpx
-from fastapi import FastAPI, HTTPException, Request, Response
-from redis.asyncio import Redis
 from app.config import settings
 from app.db import create_pool, get_api_key, init_db
 from app.rate_limit import enforce
 from app.security import JwksCache, bearer_token, client_ip, require_scope
+from fastapi import FastAPI, HTTPException, Request, Response
+from redis.asyncio import Redis
 
 MERCHANT = {
     ("POST", "payment_intents"): "payment_intents:create",
@@ -111,9 +112,8 @@ async def customer(path: str, request: Request):
         raise HTTPException(status_code=401, detail="Invalid publishable key")
 
     origin = request.headers.get("origin")
-    if origin:
-        if origin not in settings.allowed_origins or (record["allowed_origins"] and origin not in record["allowed_origins"]):
-            raise HTTPException(status_code=403, detail="Origin not allowed")
+    if origin and (origin not in settings.allowed_origins or (record["allowed_origins"] and origin not in record["allowed_origins"])):
+        raise HTTPException(status_code=403, detail="Origin not allowed")
 
     claims = await app.state.jwks.validate_jwt(bearer_token(request.headers.get("authorization")))
     scope = scope_for(request.method, path, CUSTOMER)

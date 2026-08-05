@@ -2,7 +2,8 @@
 # filename: fraud_service/app/models/fraud.py
 
 from datetime import datetime
-from sqlalchemy import Boolean, Column, DateTime, Integer, JSON, String, Text, Float
+
+from sqlalchemy import JSON, Boolean, Column, DateTime, Float, Integer, String, Text
 
 # ✅ Import Base from db, not define it here
 from fraud_service.app.db import Base

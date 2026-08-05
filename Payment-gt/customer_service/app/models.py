@@ -3,10 +3,9 @@
 
 from datetime import datetime
 
-from sqlalchemy import Boolean, Column, DateTime, Index, Integer, JSON, String
+from sqlalchemy import JSON, Boolean, Column, DateTime, Index, Integer, String
 
 from app.db import Base
-
 
 
 class PaymentSession(Base):

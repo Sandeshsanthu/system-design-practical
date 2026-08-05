@@ -3,7 +3,6 @@
 
 from fraud_service.app.schemas.fraud import RuleResult
 
-
 RISKY_EMAIL_DOMAINS = {"tempmail.com", "throwaway.email", "mailinator.com", "guerrillamail.com"}
 
 

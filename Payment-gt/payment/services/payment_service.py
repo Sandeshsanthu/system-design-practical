@@ -2,16 +2,15 @@
 # filename: Payment/services/payment_service.py
 
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 
 from fastapi import HTTPException, status
-from sqlalchemy.orm import Session
-
 from Payment.config.database import SessionLocal
 from Payment.models.enums import PaymentStatus, TransactionType
 from Payment.models.payment import Payment
 from Payment.services.bank_gateway import call_bank_capture
 from Payment.services.transaction_service import log_transaction
+from sqlalchemy.orm import Session
 
 logger = logging.getLogger(__name__)
 
@@ -41,8 +40,8 @@ async def capture_payment_internal(db: Session, payment: Payment, capture_amount
         )
 
     payment.amount_captured = (payment.amount_captured or 0) + capture_amount
-    payment.captured_at = datetime.utcnow()
-    payment.updated_at = datetime.utcnow()
+    payment.captured_at = datetime.now(tz=timezone.utc)
+    payment.updated_at = datetime.now(tz=timezone.utc)
 
     if payment.amount_captured >= (payment.authorized_amount or payment.amount):
         payment.status = PaymentStatus.CAPTURED.value
@@ -73,8 +72,8 @@ async def auto_capture(payment_id: str, amount: int, merchant_id: str):
         payment = db.query(Payment).filter_by(id=payment_id, merchant_id=merchant_id).first()
         if payment and payment.status == PaymentStatus.AUTHORIZED.value:
             await capture_payment_internal(db, payment, amount)
-    except Exception as e:
-        logger.error(f"Auto-capture failed: {str(e)}")
+    except Exception as e: # noqa: BLE001
+        logger.error(f"Auto-capture failed: {e!s}")
         db.rollback()
     finally:
         db.close()

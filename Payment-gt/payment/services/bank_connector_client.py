@@ -15,6 +15,7 @@ bank_connector handles:
 
 import logging
 import os
+
 import httpx
 
 logger = logging.getLogger(__name__)
@@ -27,11 +28,11 @@ async def call_bank_authorize(
     payment_id: str,
     amount: int,
     card,                           # Payment.schemas.payment.CardInfo
-    merchant_id: str = None,
-    idempotency_key: str = None,
+    merchant_id: str | None = None,
+    idempotency_key: str | None = None,
     currency: str = "usd",
-    description: str = None,
-    metadata: dict = None,
+    description: str | None = None,
+    metadata: dict | None = None,
 ) -> dict:
     """
     POST /authorize → bank_connector → Stripe PaymentIntent (capture_method=manual)
@@ -86,7 +87,7 @@ async def call_bank_authorize(
     except httpx.HTTPStatusError as e:
         logger.error(f"Bank connector HTTP error: {e.response.status_code} payment={payment_id}")
         return {"success": False, "decline_code": "processor_error", "message": str(e)}
-    except Exception as e:
+    except Exception as e: # noqa: BLE001
         logger.error(f"Bank connector error: authorize payment={payment_id} error={e}")
         return {"success": False, "decline_code": "processor_error", "message": str(e)}
 
@@ -95,8 +96,8 @@ async def call_bank_capture(
     payment_id: str,
     authorization_code: str,        # Stripe PaymentIntent ID stored as authorization_code
     amount: int,
-    merchant_id: str = None,
-    idempotency_key: str = None,
+    merchant_id: str | None = None,
+    idempotency_key: str | None = None,
 ) -> dict:
     """
     POST /capture → bank_connector → stripe.PaymentIntent.capture()
@@ -122,7 +123,7 @@ async def call_bank_capture(
             "message":           data.get("failure_message"),
         }
 
-    except Exception as e:
+    except Exception as e: # noqa: BLE001
         logger.error(f"Bank connector error: capture payment={payment_id} error={e}")
         return {"success": False, "message": str(e)}
 
@@ -130,8 +131,8 @@ async def call_bank_capture(
 async def call_bank_void(
     payment_id: str,
     authorization_code: str,
-    merchant_id: str = None,
-    idempotency_key: str = None,
+    merchant_id: str | None = None,
+    idempotency_key: str | None = None,
 ) -> dict:
     """
     POST /void → bank_connector → stripe.PaymentIntent.cancel()
@@ -156,7 +157,7 @@ async def call_bank_void(
             "message":        data.get("failure_message"),
         }
 
-    except Exception as e:
+    except Exception as e: # noqa: BLE001
         logger.error(f"Bank connector error: void payment={payment_id} error={e}")
         return {"success": False, "message": str(e)}
 
@@ -164,10 +165,10 @@ async def call_bank_void(
 async def call_bank_refund(
     payment_id: str,
     amount: int,
-    processor_id: str = None,       # Stripe PaymentIntent ID
-    merchant_id: str = None,
-    reason: str = None,
-    idempotency_key: str = None,
+    processor_id: str | None = None,       # Stripe PaymentIntent ID
+    merchant_id: str | None = None,
+    reason: str | None = None,
+    idempotency_key: str | None = None,
 ) -> dict:
     """
     POST /refund → bank_connector → stripe.Refund.create()
@@ -193,6 +194,6 @@ async def call_bank_refund(
             "message":          data.get("failure_message"),
         }
 
-    except Exception as e:
+    except Exception as e: # noqa: BLE001
         logger.error(f"Bank connector error: refund payment={payment_id} error={e}")
         return {"success": False, "message": str(e)}

@@ -1,6 +1,7 @@
 # models/enums.py
 from enum import Enum
 
+
 class PaymentStatus(str, Enum):
     PENDING = "pending"
     AUTHORIZED = "authorized"

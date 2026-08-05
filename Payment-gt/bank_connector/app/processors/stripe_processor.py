@@ -3,13 +3,14 @@
 
 import logging
 import time
+
 import stripe
 from tenacity import (
+    before_sleep_log,
     retry,
+    retry_if_exception_type,
     stop_after_attempt,
     wait_exponential,
-    retry_if_exception_type,
-    before_sleep_log,
 )
 
 from bank_connector.app.config import settings
@@ -150,7 +151,7 @@ class StripeProcessor(BaseProcessor):
                     card_last4 = pm.card.last4 if pm.card else None
                     card_brand = pm.card.brand if pm.card else None
                 except Exception:
-                    pass
+                    logger.debug("Could not retrieve card details from payment method", exc_info=True)
 
             return ProcessorResponse(
                 success=True,
@@ -338,5 +339,5 @@ class StripeProcessor(BaseProcessor):
             return True
         except stripe.error.AuthenticationError:
             return False
-        except Exception:
+        except Exception: # noqa: BLE001
             return False

@@ -3,22 +3,22 @@
 
 import logging
 import uuid
-from decimal import Decimal, ROUND_HALF_UP
+from decimal import ROUND_HALF_UP, Decimal
 
 from sqlalchemy.orm import Session
 
 from ledger_service.app.config import settings
 from ledger_service.app.models.ledger import Account, LedgerEntry, LedgerTransaction
 from ledger_service.app.services.account_service import (
-    get_or_create_account,
     get_merchant_account_id,
+    get_or_create_account,
 )
 
 logger = logging.getLogger(__name__)
 
 
 def cents_to_decimal(cents: int) -> Decimal:
-    return Decimal(str(cents)) / Decimal("100")
+    return Decimal(str(cents)) / Decimal(100)
 
 
 def calculate_platform_fee(amount_cents: int) -> int:
@@ -26,9 +26,9 @@ def calculate_platform_fee(amount_cents: int) -> int:
     fee = (
         Decimal(str(amount_cents))
         * Decimal(str(settings.platform_fee_percent))
-        / Decimal("100")
+        / Decimal(100)
     )
-    return int(fee.quantize(Decimal("1"), rounding=ROUND_HALF_UP))
+    return int(fee.quantize(Decimal(1), rounding=ROUND_HALF_UP))
 
 
 def _create_entry(
@@ -41,8 +41,8 @@ def _create_entry(
     event_type: str,
     amount: Decimal,
     currency: str,
-    description: str = None,
-    metadata: dict = None,
+    description: str | None = None,
+    metadata: dict | None = None,
 ) -> LedgerEntry:
     """
     Create one ledger entry and update account balance.
@@ -79,7 +79,7 @@ def record_authorization(
     merchant_id: str,
     amount_cents: int,
     currency: str = "usd",
-    metadata: dict = None,
+    metadata: dict | None = None,
 ) -> LedgerTransaction:
     """
     Record payment authorization.
@@ -161,8 +161,8 @@ def record_capture(
     merchant_id: str,
     amount_cents: int,
     currency: str = "usd",
-    platform_fee_cents: int = None,
-    metadata: dict = None,
+    platform_fee_cents: int | None = None,
+    metadata: dict | None = None,
 ) -> LedgerTransaction:
     """
     Record payment capture.
@@ -236,7 +236,7 @@ def record_capture(
 
     # Clear merchant pending balance
     merchant_account.pending_balance = max(
-        Decimal("0"),
+        Decimal(0),
         merchant_account.pending_balance - amount,
     )
 
@@ -272,8 +272,8 @@ def record_refund(
     merchant_id: str,
     amount_cents: int,
     currency: str = "usd",
-    reason: str = None,
-    metadata: dict = None,
+    reason: str | None = None,
+    metadata: dict | None = None,
 ) -> LedgerTransaction:
     """
     Record a refund.
@@ -337,7 +337,7 @@ def record_void(
     merchant_id: str,
     amount_cents: int,
     currency: str = "usd",
-    metadata: dict = None,
+    metadata: dict | None = None,
 ) -> LedgerTransaction:
     """
     Record a void (reversal of authorization before capture).
@@ -391,7 +391,7 @@ def record_void(
 
     # Clear merchant pending balance
     merchant_account.pending_balance = max(
-        Decimal("0"),
+        Decimal(0),
         merchant_account.pending_balance - amount,
     )
 

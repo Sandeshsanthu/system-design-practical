@@ -3,6 +3,7 @@
 
 import logging
 from decimal import Decimal
+
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
@@ -25,12 +26,12 @@ def get_merchant_balance(
         return BalanceSummary(
             merchant_id=merchant_id,
             currency=currency,
-            available_balance=Decimal("0"),
-            pending_balance=Decimal("0"),
-            total_balance=Decimal("0"),
-            total_earned=Decimal("0"),
-            total_fees_paid=Decimal("0"),
-            total_refunded=Decimal("0"),
+            available_balance=Decimal(0),
+            pending_balance=Decimal(0),
+            total_balance=Decimal(0),
+            total_earned=Decimal(0),
+            total_fees_paid=Decimal(0),
+            total_refunded=Decimal(0),
         )
 
     # Total earned (all captured payments net)
@@ -38,14 +39,14 @@ def get_merchant_balance(
         LedgerEntry.account_id == account_id,
         LedgerEntry.entry_type == "debit",
         LedgerEntry.event_type == "payment.captured",
-    ).scalar() or Decimal("0")
+    ).scalar() or Decimal(0)
 
     # Total refunded
     total_refunded = db.query(func.sum(LedgerEntry.amount)).filter(
         LedgerEntry.account_id == account_id,
         LedgerEntry.entry_type == "credit",
         LedgerEntry.event_type == "payment.refunded",
-    ).scalar() or Decimal("0")
+    ).scalar() or Decimal(0)
 
     # Total fees paid
     fee_account_id = settings.fee_account_id
@@ -54,7 +55,7 @@ def get_merchant_balance(
         LedgerEntry.merchant_id == merchant_id,
         LedgerEntry.entry_type == "debit",
         LedgerEntry.event_type == "fee.collected",
-    ).scalar() or Decimal("0")
+    ).scalar() or Decimal(0)
 
     return BalanceSummary(
         merchant_id=merchant_id,
@@ -76,34 +77,34 @@ def get_platform_summary(db: Session, currency: str = "usd") -> PlatformSummary:
         LedgerEntry.account_id == settings.fee_account_id,
         LedgerEntry.entry_type == "debit",
         LedgerEntry.event_type == "fee.collected",
-    ).scalar() or Decimal("0")
+    ).scalar() or Decimal(0)
 
     # Scale up from fees to estimate volume
     # (fee = 2.5% of volume, so volume = fee / 0.025)
     if settings.platform_fee_percent > 0:
         estimated_volume = (
-            total_volume / Decimal(str(settings.platform_fee_percent)) * Decimal("100")
+            total_volume / Decimal(str(settings.platform_fee_percent)) * Decimal(100)
         )
     else:
-        estimated_volume = Decimal("0")
+        estimated_volume = Decimal(0)
 
     # Fee account balance
     fee_account = db.query(Account).filter(
         Account.id == settings.fee_account_id
     ).first()
-    total_fees = fee_account.balance if fee_account else Decimal("0")
+    total_fees = fee_account.balance if fee_account else Decimal(0)
 
     # Escrow balance
     escrow_account = db.query(Account).filter(
         Account.id == settings.escrow_account_id
     ).first()
-    escrow_balance = escrow_account.balance if escrow_account else Decimal("0")
+    escrow_balance = escrow_account.balance if escrow_account else Decimal(0)
 
     # Total refunds
     total_refunds = db.query(func.sum(LedgerEntry.amount)).filter(
         LedgerEntry.event_type == "payment.refunded",
         LedgerEntry.entry_type == "debit",
-    ).scalar() or Decimal("0")
+    ).scalar() or Decimal(0)
 
     return PlatformSummary(
         currency=currency,
