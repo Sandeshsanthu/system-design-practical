@@ -70,7 +70,7 @@ services:
   # ── APPLICATION SERVICES ──────────────────────────────────────────────────
 
   auth-service:
-    image: sandeshs/payment-gt-auth-service:90c8c62b87c2ddc4c8a8fbdaefd5434eb5268a97
+    image: sandeshs/payment-gt-auth-service:a1226fe769908c2d1bb0741651a1b7018cf38974
     container_name: auth-service
     ports:
       - "9000:9000"
@@ -83,7 +83,7 @@ services:
       retries: 20
 
   fraud-service:
-    image: sandeshs/payment-gt-fraud-service:90c8c62b87c2ddc4c8a8fbdaefd5434eb5268a97
+    image: sandeshs/payment-gt-fraud-service:a1226fe769908c2d1bb0741651a1b7018cf38974
     container_name: fraud-service
     ports:
       - "8004:8004"
@@ -113,7 +113,7 @@ services:
       retries: 20
 
   bank-connector:
-    image: sandeshs/payment-gt-bank-connector:90c8c62b87c2ddc4c8a8fbdaefd5434eb5268a97
+    image: sandeshs/payment-gt-bank-connector:a1226fe769908c2d1bb0741651a1b7018cf38974
     container_name: bank-connector
     ports:
       - "8006:8005"
@@ -141,7 +141,7 @@ services:
       retries: 20
 
   ledger-service:
-    image: sandeshs/payment-gt-ledger-service:90c8c62b87c2ddc4c8a8fbdaefd5434eb5268a97
+    image: sandeshs/payment-gt-ledger-service:a1226fe769908c2d1bb0741651a1b7018cf38974
     container_name: ledger-service
     ports:
       - "8007:8007"
@@ -165,7 +165,7 @@ services:
       retries: 20
 
   notification-service:
-    image: sandeshs/payment-gt-notification-service:90c8c62b87c2ddc4c8a8fbdaefd5434eb5268a97
+    image: sandeshs/payment-gt-notification-service:a1226fe769908c2d1bb0741651a1b7018cf38974
     container_name: notification-service
     ports:
       - "8008:8008"
@@ -190,7 +190,7 @@ services:
     restart: unless-stopped
 
   payment-service:
-    image: sandeshs/payment-gt-payment-service:90c8c62b87c2ddc4c8a8fbdaefd5434eb5268a97
+    image: sandeshs/payment-gt-payment-service:4b3d27090652feda1212c7525c3f2267a861c0bb
     container_name: payment-service
     ports:
       - "8003:8003"
@@ -225,7 +225,7 @@ services:
       retries: 20
 
   merchant-service:
-    image: sandeshs/payment-gt-merchant-service:90c8c62b87c2ddc4c8a8fbdaefd5434eb5268a97
+    image: sandeshs/payment-gt-merchant-service:a1226fe769908c2d1bb0741651a1b7018cf38974
     container_name: merchant-service
     ports:
       - "8001:8001"
@@ -244,7 +244,7 @@ services:
       retries: 20
 
   customer-service:
-    image: sandeshs/payment-gt-customer-service:90c8c62b87c2ddc4c8a8fbdaefd5434eb5268a97
+    image: sandeshs/payment-gt-customer-service:a1226fe769908c2d1bb0741651a1b7018cf38974
     container_name: customer-service
     ports:
       - "8002:8002"
@@ -268,7 +268,7 @@ services:
       retries: 20
 
   gateway:
-    image: sandeshs/payment-gt-gateway:90c8c62b87c2ddc4c8a8fbdaefd5434eb5268a97
+    image: sandeshs/payment-gt-gateway:a1226fe769908c2d1bb0741651a1b7018cf38974
     container_name: gateway
     env_file:
       - .env
@@ -310,7 +310,7 @@ services:
       retries: 20
 
   reconciliation-service:
-    image: sandeshs/payment-gt-reconciliation-service:90c8c62b87c2ddc4c8a8fbdaefd5434eb5268a97
+    image: sandeshs/payment-gt-reconciliation-service:a1226fe769908c2d1bb0741651a1b7018cf38974
     container_name: reconciliation-service
     ports:
       - "8009:8009"

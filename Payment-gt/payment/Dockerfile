@@ -23,7 +23,7 @@ RUN pip install --no-cache-dir \
     "elasticsearch[async]>=8.12.0,<8.13.0"
 
 # ✅ Context is now project root — copy both packages
-COPY Payment/ /workspace/Payment/
+COPY payment/ /workspace/payment/
 COPY fraud_service/ /workspace/fraud_service/
 
 # ✅ fraud_service needs __init__.py to be importable

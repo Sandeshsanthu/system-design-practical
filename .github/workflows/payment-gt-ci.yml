@@ -298,12 +298,12 @@ jobs:
 
           - service: payment-service
             folder:  payment                              # ← non-standard: Dockerfile lives in Payment/
-            ctx:     payment-gt                           # ← context is project root so COPY paths work
+            ctx:     Payment-gt                   # ← context is project root so COPY paths work
             file:    Payment-gt/payment/Dockerfile
 
           - service: fraud-service
             folder:  fraud_service
-            ctx:     Payment-gt/fraud_service
+            ctx:     Payment-gt
             file:    Payment-gt/fraud_service/Dockerfile
 
           - service: bank-connector
