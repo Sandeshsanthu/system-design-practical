@@ -11,20 +11,20 @@ RUN apt-get update && apt-get install -y \
     curl \
     && rm -rf /var/lib/apt/lists/*
 
-COPY requirements.txt .
+# ✅ CI context is Payment-gt (repo root), so prefix with fraud_service/
+COPY fraud_service/requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# ✅ Restore subdirectory copy — code uses 'from fraud_service.app...' imports
-COPY . /app/fraud_service/
-
-# ✅ Create the missing __init__.py so Python treats fraud_service as a package
-RUN touch /app/fraud_service/__init__.py
+# ✅ Only copies Payment-gt/fraud_service/ → /app/fraud_service/
+# ✅ Prevents double-nesting: /app/fraud_service/fraud_service/app/main.py (broken)
+# ✅ Produces correct path: /app/fraud_service/app/main.py (works)
+COPY fraud_service/ /app/fraud_service/
 
 RUN mkdir -p /app/logs
 
+# ✅ Python finds fraud_service as top-level package under /app
 ENV PYTHONPATH=/app
 
 EXPOSE 8004
 
-# ✅ Module path matches package structure: /app/fraud_service/app/main.py
 CMD ["sh", "-c", "uvicorn fraud_service.app.main:app --host 0.0.0.0 --port ${PORT:-8004}"]
