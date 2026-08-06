@@ -1,8 +1,8 @@
 # models/enums.py
-from enum import Enum
+from enum import StrEnum
 
 
-class PaymentStatus(str, Enum):
+class PaymentStatus(StrEnum):
     PENDING = "pending"
     AUTHORIZED = "authorized"
     CAPTURED = "captured"
@@ -13,13 +13,13 @@ class PaymentStatus(str, Enum):
     PARTIALLY_REFUNDED = "partially_refunded"
     EXPIRED = "expired"
 
-class TransactionType(str, Enum):
+class TransactionType(StrEnum):
     AUTHORIZATION = "authorization"
     CAPTURE = "capture"
     VOID = "void"
     REFUND = "refund"
 
-class FailureCode(str, Enum):
+class FailureCode(StrEnum):
     INSUFFICIENT_FUNDS = "insufficient_funds"
     CARD_DECLINED = "card_declined"
     EXPIRED_CARD = "expired_card"

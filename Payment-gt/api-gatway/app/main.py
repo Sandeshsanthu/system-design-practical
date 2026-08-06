@@ -1,4 +1,3 @@
-# filename: api-gatway/app/main.py
 from contextlib import asynccontextmanager
 
 import httpx
@@ -15,7 +14,7 @@ MERCHANT = {
     ("POST", "refunds"): "refunds:create",
     ("GET", "payments"): "payments:read",
     ("GET", "balance"): "balance:read",
-    ("POST", "voids"): "voids:create"
+    ("POST", "voids"): "voids:create",
 }
 CUSTOMER = {
     ("POST", "payment_sessions"): "payment_session:create",
@@ -79,7 +78,7 @@ async def proxy(req: Request, base: str, path: str, extra: dict):
             f"{base.rstrip('/')}/{path.lstrip('/')}",
             params=req.query_params,
             content=body,
-            headers=headers
+            headers=headers,
         )
     except httpx.HTTPError as e:
         raise HTTPException(status_code=502, detail=f"Upstream error: {e}") from e
@@ -98,7 +97,7 @@ async def merchant(path: str, request: Request):
     return await proxy(request, settings.merchant_service_url, path, {
         "x-merchant-id": record["merchant_id"],
         "x-key-id": record["key_id"],
-        "x-key-type": record["key_type"]
+        "x-key-type": record["key_type"],
     })
 
 @app.api_route("/v1/customer/{path:path}", methods=["GET", "POST"])
@@ -130,5 +129,5 @@ async def customer(path: str, request: Request):
         "x-key-type": record["key_type"],
         "x-user-id": str(claims.get("sub", "")),
         "x-user-email": str(claims.get("email", "")),
-        "x-user-roles": ",".join(claims.get("roles", [])) if isinstance(claims.get("roles"), list) else ""
+        "x-user-roles": ",".join(claims.get("roles", [])) if isinstance(claims.get("roles"), list) else "",
     })
