@@ -6,8 +6,8 @@ from typing import Any
 
 from sqlalchemy.orm import Session
 
-from Payment.models.enums import TransactionType
-from Payment.models.payment import Transaction
+from payment.models.enums import TransactionType
+from payment.models.payment import Transaction
 
 
 def log_transaction(

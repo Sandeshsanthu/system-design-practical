@@ -46,7 +46,7 @@ from payment.services.ledger_client import (          # ✅ was Payment.services
     notify_refund,
     notify_void,
 )
-from payment.services.capture_service import auto_capture        # ✅ was Payment.services.payment_service
+from payment.services.payment_service import auto_capture        # ✅ was Payment.services.payment_service
 from payment.services.transaction_service import log_transaction # ✅ was Payment.services
 from payment.utils.cards import generate_card_fingerprint, get_card_brand  # ✅ was Payment.utils
 

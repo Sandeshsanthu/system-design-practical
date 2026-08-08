@@ -12,7 +12,7 @@ import secrets
 
 import uuid
 
-from Payment.schemas.payment import CardInfo
+from payment.schemas.payment import CardInfo
 
 
 async def call_bank_authorize(_payment_id: str, _amount: int, _card: CardInfo) -> dict:
