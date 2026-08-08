@@ -44,7 +44,7 @@ from Payment.services.ledger_client import (
     notify_refund,
     notify_void,
 )
-from Payment.services.notification_client import notify_event
+# from Payment.services.notification_client import notify_event
 from Payment.services.payment_service import auto_capture
 from Payment.services.transaction_service import log_transaction
 from Payment.utils.cards import generate_card_fingerprint, get_card_brand
@@ -289,19 +289,19 @@ async def create_payment_intent(
             currency=payload.currency,
         )
 
-        asyncio.create_task(
-            notify_event(
-                event="payment.authorized",
-                payment_id=payment.id,
-                merchant_id=payment.merchant_id,
-                amount=payment.amount / 100,
-                currency=payment.currency,
-                customer_email=payment.customer_email,
-                customer_name=payment.customer_name,
-                merchant_email=None,
-                metadata={"idempotency_key": idempotency_key},
-            ),
-        )
+        # asyncio.create_task(
+        #     notify_event(
+        #         event="payment.authorized",
+        #         payment_id=payment.id,
+        #         merchant_id=payment.merchant_id,
+        #         amount=payment.amount / 100,
+        #         currency=payment.currency,
+        #         customer_email=payment.customer_email,
+        #         customer_name=payment.customer_name,
+        #         merchant_email=None,
+        #         metadata={"idempotency_key": idempotency_key},
+        #     ),
+        # )
 
         # ── AUTO CAPTURE ──────────────────────────────────────────────────────
 
@@ -450,17 +450,17 @@ async def capture_payment(
             currency=payment.currency,
         )
 
-        asyncio.create_task(
-            notify_event(
-                event="payment.captured",
-                payment_id=payment.id,
-                merchant_id=payment.merchant_id,
-                amount=capture_amount / 100,
-                currency=payment.currency,
-                customer_email=payment.customer_email,
-                customer_name=payment.customer_name,
-            ),
-        )
+        # asyncio.create_task(
+        #     notify_event(
+        #         event="payment.captured",
+        #         payment_id=payment.id,
+        #         merchant_id=payment.merchant_id,
+        #         amount=capture_amount / 100,
+        #         currency=payment.currency,
+        #         customer_email=payment.customer_email,
+        #         customer_name=payment.customer_name,
+        #     ),
+        # )
 
         return {
             "payment_id": payment.id,
@@ -562,17 +562,17 @@ async def void_payment(
             currency=payment.currency,
         )
 
-        asyncio.create_task(
-            notify_event(
-                event="payment.voided",
-                payment_id=payment.id,
-                merchant_id=payment.merchant_id,
-                amount=payment.amount / 100,
-                currency=payment.currency,
-                customer_email=payment.customer_email,
-                customer_name=payment.customer_name,
-            ),
-        )
+        # asyncio.create_task(
+        #     notify_event(
+        #         event="payment.voided",
+        #         payment_id=payment.id,
+        #         merchant_id=payment.merchant_id,
+        #         amount=payment.amount / 100,
+        #         currency=payment.currency,
+        #         customer_email=payment.customer_email,
+        #         customer_name=payment.customer_name,
+        #     ),
+        # )
 
         return {
             "payment_id": payment.id,
@@ -756,18 +756,18 @@ async def refund_payment(
             reason=payload.reason,
         )
 
-        asyncio.create_task(
-            notify_event(
-                event="payment.refunded",
-                payment_id=payment.id,
-                merchant_id=payment.merchant_id,
-                amount=payment.amount / 100,
-                currency=payment.currency,
-                customer_email=payment.customer_email,
-                customer_name=payment.customer_name,
-                refund_amount=refund_amount / 100,
-            ),
-        )
+        # asyncio.create_task(
+        #     notify_event(
+        #         event="payment.refunded",
+        #         payment_id=payment.id,
+        #         merchant_id=payment.merchant_id,
+        #         amount=payment.amount / 100,
+        #         currency=payment.currency,
+        #         customer_email=payment.customer_email,
+        #         customer_name=payment.customer_name,
+        #         refund_amount=refund_amount / 100,
+        #     ),
+        # )
 
         return {
             "id": refund.id,
