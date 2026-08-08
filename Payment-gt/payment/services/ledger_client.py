@@ -5,13 +5,11 @@ HTTP_NOT_FOUND = 404
 
 import logging
 
-HTTP_OK       = 200
-HTTP_NOT_FOUND = 404
+
 
 import os
 
-HTTP_OK       = 200
-HTTP_NOT_FOUND = 404
+
 
 import httpx
 

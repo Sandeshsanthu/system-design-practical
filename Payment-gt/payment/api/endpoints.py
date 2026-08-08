@@ -18,10 +18,10 @@ from fastapi import (
 from sqlalchemy.orm import Session
 
 from fraud_service.app.services.fraud_client import check_fraud
-from Payment.config.database import get_db
-from Payment.models.enums import PaymentStatus, TransactionType
-from Payment.models.payment import Payment, Refund
-from Payment.schemas.payment import (
+from payment.config.database import get_db
+from payment.models.enums import PaymentStatus, TransactionType
+from payment.models.payment import Payment, Refund
+from payment.schemas.payment import (
     CaptureRequest,
     CreatePaymentRequest,
     RefundRequest,

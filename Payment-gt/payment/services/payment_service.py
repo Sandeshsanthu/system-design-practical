@@ -65,13 +65,14 @@ async def capture_payment_internal(db: Session, payment: Payment, capture_amount
 
     return capture_response
 
-
 async def auto_capture(payment_id: str, amount: int, merchant_id: str):
     db = SessionLocal()
     try:
-        payment = db.query(Payment)
-        .filter_by(id=payment_id, merchant_id=merchant_id)
-        .first()
+        payment = (
+            db.query(Payment)
+            .filter_by(id=payment_id, merchant_id=merchant_id)
+            .first()
+        )
         if payment and payment.status == PaymentStatus.AUTHORIZED.value:
             await capture_payment_internal(db, payment, amount)
     except Exception as e:

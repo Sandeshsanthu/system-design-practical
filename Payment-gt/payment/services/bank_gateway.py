@@ -4,13 +4,11 @@ AUTHORIZE_SUCCESS_RATE = 0.9
 
 import asyncio
 
-AUTHORIZE_SUCCESS_RATE = 0.9
 
-AUTHORIZE_SUCCESS_RATE = 0.9
 
 import secrets
 
-AUTHORIZE_SUCCESS_RATE = 0.9
+
 
 import uuid
 

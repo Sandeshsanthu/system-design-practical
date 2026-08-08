@@ -70,7 +70,7 @@ services:
   # ── APPLICATION SERVICES ──────────────────────────────────────────────────
 
   auth-service:
-    image: sandeshs/payment-gt-auth-service:6be76ded9dc089af0c7f96bc86d3d14dfce4e894
+    image: sandeshs/payment-gt-auth-service:5ddec6dc5004979141d00fe065a54385800a82e0
     container_name: auth-service
     ports:
       - "9000:9000"
@@ -114,7 +114,7 @@ services:
       retries: 20
 
   bank-connector:
-    image: sandeshs/payment-gt-bank-connector:6be76ded9dc089af0c7f96bc86d3d14dfce4e894
+    image: sandeshs/payment-gt-bank-connector:5ddec6dc5004979141d00fe065a54385800a82e0
     container_name: bank-connector
     ports:
       - "8006:8005"
@@ -142,7 +142,7 @@ services:
       retries: 20
 
   ledger-service:
-    image: sandeshs/payment-gt-ledger-service:6be76ded9dc089af0c7f96bc86d3d14dfce4e894
+    image: sandeshs/payment-gt-ledger-service:5ddec6dc5004979141d00fe065a54385800a82e0
     container_name: ledger-service
     ports:
       - "8007:8007"
@@ -164,34 +164,34 @@ services:
       interval: 5s
       timeout: 3s
       retries: 20
-
-  notification-service:
-    image: sandeshs/payment-gt-notification-service:6be76ded9dc089af0c7f96bc86d3d14dfce4e894
-    container_name: notification-service
-    ports:
-      - "8008:8008"
-    environment:
-      DATABASE_URL: postgresql://payments:payments@postgres:5432/notification_db
-      PORT: "8008"
-      MOCK_EMAIL: "true"
-      MOCK_SMS: "true"
-      WEBHOOK_SIGNING_SECRET: whsec_dev_secret_32_chars_minimum_x
-      WEBHOOK_TIMEOUT_SECONDS: "10"
-      WEBHOOK_MAX_RETRIES: "3"
-    networks:
-      - payment-net
-    depends_on:
-      postgres:
-        condition: service_healthy
-    healthcheck:
-      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8008/health')\""]
-      interval: 5s
-      timeout: 3s
-      retries: 20
-    restart: unless-stopped
+#
+#  notification-service:
+#    image: sandeshs/payment-gt-notification-service:5ddec6dc5004979141d00fe065a54385800a82e0
+#    container_name: notification-service
+#    ports:
+#      - "8008:8008"
+#    environment:
+#      DATABASE_URL: postgresql://payments:payments@postgres:5432/notification_db
+#      PORT: "8008"
+#      MOCK_EMAIL: "true"
+#      MOCK_SMS: "true"
+#      WEBHOOK_SIGNING_SECRET: whsec_dev_secret_32_chars_minimum_x
+#      WEBHOOK_TIMEOUT_SECONDS: "10"
+#      WEBHOOK_MAX_RETRIES: "3"
+#    networks:
+#      - payment-net
+#    depends_on:
+#      postgres:
+#        condition: service_healthy
+#    healthcheck:
+#      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8008/health')\""]
+#      interval: 5s
+#      timeout: 3s
+#      retries: 20
+#    restart: unless-stopped
 
   payment-service:
-    image: sandeshs/payment-gt-payment-service:6be76ded9dc089af0c7f96bc86d3d14dfce4e894
+    image: sandeshs/payment-gt-payment-service:5ddec6dc5004979141d00fe065a54385800a82e0
     container_name: payment-service
     ports:
       - "8003:8003"
@@ -216,8 +216,8 @@ services:
         condition: service_healthy
       ledger-service:
         condition: service_healthy
-      notification-service:
-        condition: service_healthy
+#      notification-service:
+#        condition: service_healthy
     healthcheck:
       test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8003/health')\""]
       interval: 5s
@@ -225,7 +225,7 @@ services:
       retries: 20
 
   merchant-service:
-    image: sandeshs/payment-gt-merchant-service:6be76ded9dc089af0c7f96bc86d3d14dfce4e894
+    image: sandeshs/payment-gt-merchant-service:5ddec6dc5004979141d00fe065a54385800a82e0
     container_name: merchant-service
     ports:
       - "8001:8001"
@@ -244,7 +244,7 @@ services:
       retries: 20
 
   customer-service:
-    image: sandeshs/payment-gt-customer-service:6be76ded9dc089af0c7f96bc86d3d14dfce4e894
+    image: sandeshs/payment-gt-customer-service:5ddec6dc5004979141d00fe065a54385800a82e0
     container_name: customer-service
     ports:
       - "8002:8002"
@@ -268,7 +268,7 @@ services:
       retries: 20
 
   gateway:
-    image: sandeshs/payment-gt-gateway:6be76ded9dc089af0c7f96bc86d3d14dfce4e894
+    image: sandeshs/payment-gt-gateway:5ddec6dc5004979141d00fe065a54385800a82e0
     container_name: gateway
     env_file:
       - .env
@@ -301,8 +301,8 @@ services:
         condition: service_healthy
       ledger-service:
         condition: service_healthy
-      notification-service:
-        condition: service_healthy
+#      notification-service:
+#        condition: service_healthy
     healthcheck:
       test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8080/health')\""]
       interval: 5s
@@ -310,7 +310,7 @@ services:
       retries: 20
 
   reconciliation-service:
-    image: sandeshs/payment-gt-reconciliation-service:6be76ded9dc089af0c7f96bc86d3d14dfce4e894
+    image: sandeshs/payment-gt-reconciliation-service:5ddec6dc5004979141d00fe065a54385800a82e0
     container_name: reconciliation-service
     ports:
       - "8009:8009"
@@ -337,8 +337,8 @@ services:
         condition: service_healthy
       merchant-service:
         condition: service_healthy
-      notification-service:
-        condition: service_healthy
+#      notification-service:
+#        condition: service_healthy
     healthcheck:
       test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8009/health')\""]
       interval: 5s
