@@ -38,31 +38,31 @@ resources:
 images:
 - name: sandeshs/payment-gt-auth-service
   newName: sandeshs/payment-gt-auth-service
-  newTag: ebebf809339b3a5416f9c404dad3b919843c4181
+  newTag: 6be76ded9dc089af0c7f96bc86d3d14dfce4e894
 - name: sandeshs/payment-gt-bank-connector
   newName: sandeshs/payment-gt-bank-connector
-  newTag: ebebf809339b3a5416f9c404dad3b919843c4181
+  newTag: 6be76ded9dc089af0c7f96bc86d3d14dfce4e894
 - name: sandeshs/payment-gt-customer-service
   newName: sandeshs/payment-gt-customer-service
-  newTag: ebebf809339b3a5416f9c404dad3b919843c4181
+  newTag: 6be76ded9dc089af0c7f96bc86d3d14dfce4e894
 - name: sandeshs/payment-gt-fraud-service
   newName: sandeshs/payment-gt-fraud-service
-  newTag: ebebf809339b3a5416f9c404dad3b919843c4181
+  newTag: 6be76ded9dc089af0c7f96bc86d3d14dfce4e894
 - name: sandeshs/payment-gt-gateway
   newName: sandeshs/payment-gt-gateway
-  newTag: ebebf809339b3a5416f9c404dad3b919843c4181
+  newTag: 6be76ded9dc089af0c7f96bc86d3d14dfce4e894
 - name: sandeshs/payment-gt-ledger-service
   newName: sandeshs/payment-gt-ledger-service
-  newTag: ebebf809339b3a5416f9c404dad3b919843c4181
+  newTag: 6be76ded9dc089af0c7f96bc86d3d14dfce4e894
 - name: sandeshs/payment-gt-merchant-service
   newName: sandeshs/payment-gt-merchant-service
-  newTag: ebebf809339b3a5416f9c404dad3b919843c4181
+  newTag: 6be76ded9dc089af0c7f96bc86d3d14dfce4e894
 - name: sandeshs/payment-gt-notification-service
   newName: sandeshs/payment-gt-notification-service
-  newTag: ebebf809339b3a5416f9c404dad3b919843c4181
+  newTag: 6be76ded9dc089af0c7f96bc86d3d14dfce4e894
 - name: sandeshs/payment-gt-payment-service
   newName: sandeshs/payment-gt-payment-service
-  newTag: ebebf809339b3a5416f9c404dad3b919843c4181
+  newTag: 6be76ded9dc089af0c7f96bc86d3d14dfce4e894
 - name: sandeshs/payment-gt-reconciliation-service
   newName: sandeshs/payment-gt-reconciliation-service
-  newTag: ebebf809339b3a5416f9c404dad3b919843c4181
+  newTag: 6be76ded9dc089af0c7f96bc86d3d14dfce4e894
