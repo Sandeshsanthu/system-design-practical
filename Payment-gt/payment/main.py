@@ -4,10 +4,10 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from sqlalchemy import text
 
-from Payment.api.endpoints import router as payment_router
-from Payment.config.database import DATABASE_URL, Base, SessionLocal, engine
-from Payment.models import payment  # noqa: F401
-from Payment.search import initialize_search, shutdown_search
+from payment.api.endpoints import router as payment_router
+from payment.config.database import DATABASE_URL, Base, SessionLocal, engine
+from payment.models import payment  # noqa: F401
+from payment.search import initialize_search, shutdown_search
 
 logger = logging.getLogger(__name__)
 
