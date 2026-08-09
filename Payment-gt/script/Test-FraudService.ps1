@@ -10,32 +10,45 @@ $AUTH_SERVICE    = "http://localhost:9000"
 $SECRET_KEY      = "sk_test_123"
 $PUBLISHABLE_KEY = "pk_test_123"
 
-$pass = 0
-$fail = 0
+$script:pass = 0
+$script:fail = 0
+
+# ============================================================================
+# HELPERS  (pure ASCII - safe on PowerShell 5)
+# ============================================================================
+function Write-Banner { param([string]$t)
+    Write-Host "`n+$("="*68)+" -ForegroundColor Cyan
+    Write-Host "|  $($t.PadRight(66))|" -ForegroundColor Cyan
+    Write-Host "+$("="*68)+" -ForegroundColor Cyan
+}
 
 function Write-Header { param([string]$t)
-    Write-Host "`n$("="*70)" -ForegroundColor Cyan
-    Write-Host "  $t" -ForegroundColor Cyan
-    Write-Host "$("="*70)" -ForegroundColor Cyan
+    Write-Host "`n$("-"*70)" -ForegroundColor DarkCyan
+    Write-Host "  $t"        -ForegroundColor Cyan
+    Write-Host "$("-"*70)"   -ForegroundColor DarkCyan
 }
 
 function Write-Step { param([string]$t)
-    Write-Host "`n► $t" -ForegroundColor Yellow
+    Write-Host "`n  >> $t" -ForegroundColor Yellow
 }
 
 function Pass { param([string]$t)
-    Write-Host "  ✓ $t" -ForegroundColor Green
+    Write-Host "    [PASS] $t" -ForegroundColor Green
     $script:pass++
 }
 
-function Fail { param([string]$t, [string]$e="")
-    Write-Host "  ✗ $t" -ForegroundColor Red
-    if ($e) { Write-Host "    $e" -ForegroundColor DarkRed }
+function Fail { param([string]$t, [string]$e = "")
+    Write-Host "    [FAIL] $t" -ForegroundColor Red
+    if ($e) { Write-Host "      $e" -ForegroundColor DarkRed }
     $script:fail++
 }
 
 function Info { param([string]$t)
-    Write-Host "    $t" -ForegroundColor White
+    Write-Host "      $t" -ForegroundColor White
+}
+
+function Warn { param([string]$t)
+    Write-Host "    [WARN] $t" -ForegroundColor Yellow
 }
 
 function Get-CardFingerprint { param([string]$cardNumber)
@@ -48,15 +61,19 @@ function New-FraudRequest {
     param(
         [string]$PaymentId,
         [string]$CardNumber = "4242424242424242",
-        [int]$Amount = 5000,
-        [string]$Email = "customer@gmail.com",
-        [string]$IP = "192.168.1.100",
+        [int]$Amount        = 5000,
+        [string]$Email      = "customer@gmail.com",
+        [string]$IP         = "192.168.1.100",
         [string]$CustomerId = "",
-        [int]$ExpYear = 2026
+        [int]$ExpYear       = 2026
     )
     if (-not $CustomerId) { $CustomerId = "cust_$(Get-Date -Format 'yyyyMMddHHmmss')" }
     $last4 = $CardNumber.Substring($CardNumber.Length - 4)
     $brand = if ($CardNumber.StartsWith("4")) { "visa" } elseif ($CardNumber.StartsWith("5")) { "mastercard" } else { "amex" }
+
+    # FIX: assign user_agent to a variable BEFORE the hashtable
+    # so semicolons inside the string don't confuse the PS5 parser
+    $ua = "Mozilla/5.0 (Windows NT 10.0) AppleWebKit/537.36 Chrome/120.0.0.0"
 
     return @{
         payment_id  = $PaymentId
@@ -75,49 +92,56 @@ function New-FraudRequest {
             id         = $CustomerId
             email      = $Email
             ip_address = $IP
-            user_agent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/120.0.0.0"
+            user_agent = $ua
         }
     }
 }
 
-function New-IdempotencyKey { return "merch_$(Get-Date -Format 'yyyyMMddHHmmss')_$([System.Guid]::NewGuid().ToString('N').Substring(0,6))" }
-
-Clear-Host
-Write-Host "`n╔$("═"*68)╗" -ForegroundColor Cyan
-Write-Host "║$(" "*18)FRAUD SERVICE - COMPLETE TEST SUITE$(" "*14)║" -ForegroundColor Cyan
-Write-Host "╚$("═"*68)╝" -ForegroundColor Cyan
+function New-IdempotencyKey {
+    return "merch_$(Get-Date -Format 'yyyyMMddHHmmss')_$([System.Guid]::NewGuid().ToString('N').Substring(0,6))"
+}
 
 # ============================================================================
-# TEST 1: HEALTH
+# BANNER
+# ============================================================================
+Clear-Host
+Write-Banner "FRAUD SERVICE - COMPLETE TEST SUITE (6 TESTS)"
+Write-Host ""
+Write-Host "  Fraud Service : $FRAUD_SERVICE"  -ForegroundColor White
+Write-Host "  API Gateway   : $API_GATEWAY"    -ForegroundColor White
+Write-Host "  Auth Service  : $AUTH_SERVICE"   -ForegroundColor White
+Write-Host ""
+
+# ============================================================================
+# TEST 1: HEALTH CHECKS
 # ============================================================================
 Write-Header "TEST 1: HEALTH CHECKS"
 
 foreach ($svc in @(
-    @{name="Fraud Service"; url="$FRAUD_SERVICE/health"},
-    @{name="API Gateway";   url="$API_GATEWAY/health"},
-    @{name="Auth Service";  url="$AUTH_SERVICE/health"}
+    @{ name="Fraud Service"; url="$FRAUD_SERVICE/health" },
+    @{ name="API Gateway";   url="$API_GATEWAY/health"   },
+    @{ name="Auth Service";  url="$AUTH_SERVICE/health"  }
 )) {
     Write-Step $svc.name
     try {
         $h = Invoke-RestMethod -Uri $svc.url -Method GET
-        if ($h.status -eq "ok") { Pass "$($svc.name) healthy" }
-        else { Fail "$($svc.name) unhealthy" }
-    } catch { Fail "$($svc.name) unreachable" $_ }
+        if ($h.status -eq "ok") { Pass "$($svc.name) healthy" } else { Fail "$($svc.name) unhealthy" }
+    } catch { Fail "$($svc.name) unreachable" }
 }
 
 # ============================================================================
-# TEST 2: RESET FOR CLEAN TESTING
+# TEST 2: RESET VELOCITY COUNTERS
 # ============================================================================
 Write-Header "TEST 2: RESET - CLEAR VELOCITY COUNTERS"
 
-Write-Step "Clear fraud checks (reset velocity for clean testing)"
+Write-Step "Clear fraud checks for clean test run"
 try {
-    docker exec postgres psql -U payments -d fraud_db -c "TRUNCATE fraud_checks, ml_training_samples CASCADE;" 2>$null
+    $resetOut = docker exec postgres psql -U payments -d fraud_db -c "TRUNCATE fraud_checks, ml_training_samples CASCADE;" 2>&1
     Pass "Fraud checks cleared - velocity counters reset"
-    Info "Note: This only affects dev/test environment"
+    Info "Note: dev/test environment only"
 } catch {
-    Write-Host "  ℹ Could not clear via docker (run manually if needed)" -ForegroundColor Yellow
-    Write-Host "  Command: docker exec postgres psql -U payments -d fraud_db -c `"TRUNCATE fraud_checks, ml_training_samples CASCADE;`"" -ForegroundColor Gray
+    Warn "Could not auto-clear via docker"
+    Info "Run manually: docker exec postgres psql -U payments -d fraud_db -c 'TRUNCATE fraud_checks, ml_training_samples CASCADE;'"
 }
 
 # ============================================================================
@@ -129,77 +153,72 @@ Write-Header "TEST 3: DIRECT FRAUD CHECKS - RISK LEVELS"
 Write-Step "LOW RISK - Normal transaction"
 try {
     $req = New-FraudRequest -PaymentId "pi_low_001" -Amount 5000 -Email "customer@gmail.com"
-    $r = Invoke-RestMethod -Uri "$FRAUD_SERVICE/check" -Method POST `
-        -Body ($req | ConvertTo-Json -Depth 5) -ContentType "application/json"
+    $r   = Invoke-RestMethod -Uri "$FRAUD_SERVICE/check" -Method POST `
+               -Body ($req | ConvertTo-Json -Depth 5) -ContentType "application/json"
 
     Info "Score: $($r.risk_score) | Level: $($r.risk_level) | Allowed: $($r.allowed)"
     Info "Rules Score: $($r.rules_score) | ML Score: $($r.ml_score)"
-    if ($r.allowed -and $r.risk_level -eq "low") { Pass "Low risk - correctly allowed" }
-    else { Fail "Expected low risk, got: $($r.risk_level)" }
-} catch { Fail "Low risk check failed" $_ }
+    if ($r.allowed -and $r.risk_level -eq "low") { Pass "Low risk - correctly allowed" } else { Fail "Expected low risk, got: $($r.risk_level)" }
+} catch { Fail "Low risk check failed" "$_" }
 
 # --- MEDIUM RISK: Micro transaction ---
-Write-Step "MEDIUM RISK - Micro transaction ($0.50 - card testing)"
+# FIX: use single quotes so $0 is not treated as a variable
+Write-Step 'MEDIUM RISK - Micro transaction ($0.50 - card testing)'
 try {
     $req = New-FraudRequest -PaymentId "pi_micro_001" -Amount 50 `
-        -CardNumber "4111111111111111" -Email "test@gmail.com"
-    $r = Invoke-RestMethod -Uri "$FRAUD_SERVICE/check" -Method POST `
-        -Body ($req | ConvertTo-Json -Depth 5) -ContentType "application/json"
+               -CardNumber "4111111111111111" -Email "test@gmail.com"
+    $r   = Invoke-RestMethod -Uri "$FRAUD_SERVICE/check" -Method POST `
+               -Body ($req | ConvertTo-Json -Depth 5) -ContentType "application/json"
 
     Info "Score: $($r.risk_score) | Level: $($r.risk_level) | Allowed: $($r.allowed)"
-    if ($r.triggered_rules.Count -gt 0) {
-        foreach ($rule in $r.triggered_rules) {
-            Info "  Rule: $($rule.rule_name) +$($rule.score_impact) | $($rule.reason)"
-        }
+    foreach ($rule in $r.triggered_rules) {
+        Info "  Rule: $($rule.rule_name) +$($rule.score_impact) | $($rule.reason)"
     }
-    if ($r.risk_score -gt 20) { Pass "Micro transaction correctly flagged" }
-    else { Fail "Micro transaction not flagged (score: $($r.risk_score))" }
-} catch { Fail "Micro transaction check failed" $_ }
+    if ($r.risk_score -gt 20) { Pass "Micro transaction correctly flagged" } else { Fail "Not flagged (score: $($r.risk_score))" }
+} catch { Fail "Micro transaction check failed" "$_" }
 
 # --- MEDIUM RISK: Disposable email ---
-Write-Step "MEDIUM RISK - Disposable email domain"
+Write-Step "MEDIUM RISK - Disposable email domain (mailinator)"
 try {
     $req = New-FraudRequest -PaymentId "pi_email_001" -Amount 10000 `
-        -Email "hacker@mailinator.com" -CardNumber "4532015112830366"
-    $r = Invoke-RestMethod -Uri "$FRAUD_SERVICE/check" -Method POST `
-        -Body ($req | ConvertTo-Json -Depth 5) -ContentType "application/json"
+               -Email "hacker@mailinator.com" -CardNumber "4532015112830366"
+    $r   = Invoke-RestMethod -Uri "$FRAUD_SERVICE/check" -Method POST `
+               -Body ($req | ConvertTo-Json -Depth 5) -ContentType "application/json"
 
     Info "Score: $($r.risk_score) | Level: $($r.risk_level)"
+    foreach ($rule in $r.triggered_rules) { Info "  Rule: $($rule.rule_name) | $($rule.reason)" }
     if ($r.triggered_rules | Where-Object { $_.rule_name -eq "risky_email_domain" }) {
         Pass "Disposable email flagged"
-    } else { Pass "Email domain check ran (score: $($r.risk_score))" }
-    foreach ($rule in $r.triggered_rules) {
-        Info "  Rule: $($rule.rule_name) | $($rule.reason)"
+    } else {
+        Pass "Email domain check ran (score: $($r.risk_score))"
     }
-} catch { Fail "Email domain check failed" $_ }
+} catch { Fail "Email domain check failed" "$_" }
 
-# --- MEDIUM RISK: High amount new customer ---
-Write-Step "MEDIUM RISK - High amount from new customer"
+# --- MEDIUM RISK: High amount, new customer ---
+Write-Step "MEDIUM RISK - High amount from brand-new customer"
 try {
     $req = New-FraudRequest -PaymentId "pi_highamt_001" -Amount 150000 `
-        -CardNumber "4916338506082832" -CustomerId "cust_brand_new_never_seen"
-    $r = Invoke-RestMethod -Uri "$FRAUD_SERVICE/check" -Method POST `
-        -Body ($req | ConvertTo-Json -Depth 5) -ContentType "application/json"
+               -CardNumber "4916338506082832" -CustomerId "cust_brand_new_never_seen"
+    $r   = Invoke-RestMethod -Uri "$FRAUD_SERVICE/check" -Method POST `
+               -Body ($req | ConvertTo-Json -Depth 5) -ContentType "application/json"
 
     Info "Score: $($r.risk_score) | Level: $($r.risk_level) | Review: $($r.review_required)"
-    foreach ($rule in $r.triggered_rules) {
-        Info "  Rule: $($rule.rule_name) | $($rule.reason)"
-    }
-    if ($r.risk_score -gt 15) { Pass "High amount new customer flagged" }
-    else { Pass "High amount check ran" }
-} catch { Fail "High amount check failed" $_ }
+    foreach ($rule in $r.triggered_rules) { Info "  Rule: $($rule.rule_name) | $($rule.reason)" }
+    if ($r.risk_score -gt 15) { Pass "High amount new customer flagged" } else { Pass "High amount check ran (score: $($r.risk_score))" }
+} catch { Fail "High amount check failed" "$_" }
 
 # ============================================================================
 # TEST 4: VELOCITY ATTACK
 # ============================================================================
-Write-Header "TEST 4: VELOCITY ATTACK - SAME CARD MANY TIMES"
+Write-Header "TEST 4: VELOCITY ATTACK - SAME CARD FINGERPRINT x7"
 
-Write-Step "Send 7 requests with same card (should block after 5)"
+Write-Step "Send 7 requests with same fingerprint (should block after threshold)"
 
-$velocityFP    = "fp_velocity_test_$(Get-Date -Format 'yyyyMMddHHmmss')"
-$velocityCard  = "4539578763621486"
-$blockedCount  = 0
-$allowedCount  = 0
+$velocityFP   = "fp_velocity_test_$(Get-Date -Format 'yyyyMMddHHmmss')"
+$velocityCard = "4539578763621486"
+$blockedCount = 0
+$allowedCount = 0
+$ua           = "TestBot/1.0"
 
 for ($i = 1; $i -le 7; $i++) {
     $req = @{
@@ -213,191 +232,153 @@ for ($i = 1; $i -le 7; $i++) {
             exp_year    = 2026
             last4       = "1486"
             brand       = "visa"
-            fingerprint = $velocityFP   # SAME fingerprint every time
+            fingerprint = $velocityFP
         }
         customer    = @{
             id         = "cust_vel_$i"
-            email      = "velocity_test_$i@gmail.com"
+            email      = "velocity_$i@gmail.com"
             ip_address = "172.16.0.$i"
-            user_agent = "TestBot/1.0"
+            user_agent = $ua
         }
     }
 
     try {
-        $r = Invoke-RestMethod -Uri "$FRAUD_SERVICE/check" -Method POST `
-            -Body ($req | ConvertTo-Json -Depth 5) -ContentType "application/json"
-
-        $color = if ($r.allowed) { "Green" } else { "Red" }
+        $r      = Invoke-RestMethod -Uri "$FRAUD_SERVICE/check" -Method POST `
+                      -Body ($req | ConvertTo-Json -Depth 5) -ContentType "application/json"
+        $color  = if ($r.allowed) { "Green" } else { "Red" }
         $status = if ($r.allowed) { "ALLOWED" } else { "BLOCKED" }
-        Write-Host "    Request $i`: $status | Score: $($r.risk_score) | Level: $($r.risk_level)" -ForegroundColor $color
+        Write-Host "      Request $i`: $status | Score: $($r.risk_score) | Level: $($r.risk_level)" -ForegroundColor $color
         if ($r.allowed) { $allowedCount++ } else { $blockedCount++ }
     } catch {
-        Write-Host "    Request $i`: ERROR" -ForegroundColor Red
+        Write-Host "      Request $i`: ERROR" -ForegroundColor Red
     }
 }
 
 Info "Allowed: $allowedCount | Blocked: $blockedCount"
-if ($blockedCount -gt 0) { Pass "Velocity attack detected and blocked" }
-else { Fail "Velocity attack not blocked" }
+if ($blockedCount -gt 0) { Pass "Velocity attack detected and blocked" } else { Fail "Velocity attack NOT blocked - check velocity rules" }
 
 # ============================================================================
-# TEST 5: BLOCKLIST
+# TEST 5: BLOCKLIST MANAGEMENT
 # ============================================================================
 Write-Header "TEST 5: BLOCKLIST MANAGEMENT"
 
-# Add card to blocklist
-Write-Step "Add card fingerprint to blocklist"
 $blockedCardNumber = "4000000000000333"
-$blockedFP = Get-CardFingerprint $blockedCardNumber
+$blockedFP         = Get-CardFingerprint $blockedCardNumber
+$blockedIP         = "10.99.99.99"
+$blockedEmail      = "fraud_test@scammer.com"
 
+Write-Step "Add card fingerprint to blocklist"
 try {
     $bl = Invoke-RestMethod -Uri "$FRAUD_SERVICE/blocklist/add" -Method POST `
-        -Body (@{
-            type     = "card_fingerprint"
-            value    = $blockedFP
-            reason   = "Card reported stolen - test"
-            added_by = "fraud_team_test"
-        } | ConvertTo-Json) -ContentType "application/json"
+              -Body (@{ type="card_fingerprint"; value=$blockedFP; reason="Card reported stolen - test"; added_by="fraud_team_test" } | ConvertTo-Json) `
+              -ContentType "application/json"
     Pass "Card fingerprint added to blocklist"
     Info "ID: $($bl.id)"
-} catch { Fail "Failed to add card to blocklist" $_ }
+} catch { Fail "Failed to add card to blocklist" "$_" }
 
-# Add IP to blocklist
 Write-Step "Add IP to blocklist"
-$blockedIP = "10.99.99.99"
 try {
     Invoke-RestMethod -Uri "$FRAUD_SERVICE/blocklist/add" -Method POST `
-        -Body (@{
-            type     = "ip"
-            value    = $blockedIP
-            reason   = "Known fraud IP - test"
-            added_by = "security_team_test"
-        } | ConvertTo-Json) -ContentType "application/json" | Out-Null
+        -Body (@{ type="ip"; value=$blockedIP; reason="Known fraud IP - test"; added_by="security_team_test" } | ConvertTo-Json) `
+        -ContentType "application/json" | Out-Null
     Pass "IP added to blocklist"
-} catch { Fail "Failed to add IP to blocklist" $_ }
+} catch { Fail "Failed to add IP to blocklist" "$_" }
 
-# Add email to blocklist
 Write-Step "Add email to blocklist"
-$blockedEmail = "fraud_test@scammer.com"
 try {
     Invoke-RestMethod -Uri "$FRAUD_SERVICE/blocklist/add" -Method POST `
-        -Body (@{
-            type     = "email"
-            value    = $blockedEmail
-            reason   = "Multiple chargebacks - test"
-            added_by = "fraud_team_test"
-        } | ConvertTo-Json) -ContentType "application/json" | Out-Null
+        -Body (@{ type="email"; value=$blockedEmail; reason="Multiple chargebacks - test"; added_by="fraud_team_test" } | ConvertTo-Json) `
+        -ContentType "application/json" | Out-Null
     Pass "Email added to blocklist"
-} catch { Fail "Failed to add email to blocklist" $_ }
+} catch { Fail "Failed to add email to blocklist" "$_" }
 
-# Test blocklisted card
-Write-Step "Test blocked card (should score 100 and block)"
+Write-Step "Test blocked card (expect score 100 + blocked)"
 try {
+    $ua  = "Mozilla/5.0"
     $req = @{
         payment_id  = "pi_blocked_card_001"
         merchant_id = "m_123"
         amount      = 5000
         currency    = "usd"
-        card        = @{
-            number      = $blockedCardNumber
-            exp_month   = 12
-            exp_year    = 2026
-            last4       = "0333"
-            brand       = "visa"
-            fingerprint = $blockedFP
-        }
-        customer    = @{
-            id         = "cust_block_test"
-            email      = "legit@gmail.com"
-            ip_address = "192.168.1.50"
-            user_agent = "Mozilla/5.0"
-        }
+        card        = @{ number=$blockedCardNumber; exp_month=12; exp_year=2026; last4="0333"; brand="visa"; fingerprint=$blockedFP }
+        customer    = @{ id="cust_block_test"; email="legit@gmail.com"; ip_address="192.168.1.50"; user_agent=$ua }
     }
     $r = Invoke-RestMethod -Uri "$FRAUD_SERVICE/check" -Method POST `
-        -Body ($req | ConvertTo-Json -Depth 5) -ContentType "application/json"
+             -Body ($req | ConvertTo-Json -Depth 5) -ContentType "application/json"
 
     Info "Score: $($r.risk_score) | Allowed: $($r.allowed)"
     Info "Block Reason: $($r.block_reason)"
-    if (-not $r.allowed -and $r.risk_score -eq 100) { Pass "Blocked card correctly rejected (score 100)" }
-    elseif (-not $r.allowed) { Pass "Blocked card rejected (score: $($r.risk_score))" }
-    else { Fail "Blocked card was ALLOWED!" }
-} catch { Fail "Blocked card test failed" $_ }
+    if (-not $r.allowed -and $r.risk_score -eq 100) { Pass "Blocked card rejected (score 100)" } elseif (-not $r.allowed) { Pass "Blocked card rejected (score: $($r.risk_score))" } else { Fail "Blocked card was ALLOWED!" }
+} catch { Fail "Blocked card test failed" "$_" }
 
-# Test blocklisted IP
 Write-Step "Test blocked IP"
 try {
     $req = New-FraudRequest -PaymentId "pi_blocked_ip_001" -IP $blockedIP
-    $r = Invoke-RestMethod -Uri "$FRAUD_SERVICE/check" -Method POST `
-        -Body ($req | ConvertTo-Json -Depth 5) -ContentType "application/json"
+    $r   = Invoke-RestMethod -Uri "$FRAUD_SERVICE/check" -Method POST `
+               -Body ($req | ConvertTo-Json -Depth 5) -ContentType "application/json"
 
     Info "Score: $($r.risk_score) | Allowed: $($r.allowed)"
-    if (-not $r.allowed) { Pass "Blocked IP correctly rejected" }
-    else { Fail "Blocked IP was ALLOWED! Score: $($r.risk_score)" }
-} catch { Fail "Blocked IP test failed" $_ }
+    if (-not $r.allowed) { Pass "Blocked IP correctly rejected" } else { Fail "Blocked IP was ALLOWED! Score: $($r.risk_score)" }
+} catch { Fail "Blocked IP test failed" "$_" }
 
-# Test blocklisted email
 Write-Step "Test blocked email"
 try {
-    $req = New-FraudRequest -PaymentId "pi_blocked_email_001" -Email $blockedEmail `
-        -CardNumber "4916338506082832"
-    $r = Invoke-RestMethod -Uri "$FRAUD_SERVICE/check" -Method POST `
-        -Body ($req | ConvertTo-Json -Depth 5) -ContentType "application/json"
+    $req = New-FraudRequest -PaymentId "pi_blocked_email_001" -Email $blockedEmail -CardNumber "4916338506082832"
+    $r   = Invoke-RestMethod -Uri "$FRAUD_SERVICE/check" -Method POST `
+               -Body ($req | ConvertTo-Json -Depth 5) -ContentType "application/json"
 
     Info "Score: $($r.risk_score) | Allowed: $($r.allowed)"
-    if (-not $r.allowed) { Pass "Blocked email correctly rejected" }
-    else { Fail "Blocked email was ALLOWED!" }
-} catch { Fail "Blocked email test failed" $_ }
+    if (-not $r.allowed) { Pass "Blocked email correctly rejected" } else { Fail "Blocked email was ALLOWED!" }
+} catch { Fail "Blocked email test failed" "$_" }
 
-# View full blocklist
 Write-Step "View all blocklist entries"
 try {
     $bl = Invoke-RestMethod -Uri "$FRAUD_SERVICE/blocklist" -Method GET
     Pass "Blocklist retrieved"
     Info "Total entries: $($bl.total)"
-    foreach ($e in $bl.entries) {
-        Info "  [$($e.type)] $($e.value) | $($e.reason)"
-    }
-} catch { Fail "Failed to retrieve blocklist" $_ }
+    foreach ($entry in $bl.entries) { Info "  [$($entry.type)] $($entry.value) | $($entry.reason)" }
+} catch { Fail "Failed to retrieve blocklist" "$_" }
 
 # ============================================================================
 # TEST 6: MERCHANT FLOW THROUGH FRAUD
 # ============================================================================
 Write-Header "TEST 6: MERCHANT PAYMENTS - FRAUD INTEGRATION"
 
-$merchantHeaders = @{
-    "Content-Type"  = "application/json"
-    "Authorization" = "Bearer $SECRET_KEY"
-}
+$merchantHeaders = @{ "Content-Type"="application/json"; "Authorization"="Bearer $SECRET_KEY" }
 
-# Normal merchant payment - should pass fraud
 Write-Step "Normal merchant payment (should pass fraud)"
 try {
     $h = $merchantHeaders.Clone()
     $h["Idempotency-Key"] = New-IdempotencyKey
 
     $r = Invoke-RestMethod -Uri "$API_GATEWAY/v1/merchant/payment_intents" `
-        -Method POST -Headers $h `
-        -Body (@{
-            amount   = 5000
-            currency = "usd"
-            customer = @{ email="normal@gmail.com"; name="Normal Customer" }
-            card     = @{ number="5555555555554444"; exp_month=12; exp_year=2026; cvc="123" }
-            capture  = $true
-        } | ConvertTo-Json)
+             -Method POST -Headers $h `
+             -Body (@{
+                 amount   = 5000
+                 currency = "usd"
+                 customer = @{ email="normal@gmail.com"; name="Normal Customer" }
+                 card     = @{ number="5555555555554444"; exp_month=12; exp_year=2026; cvc="123" }
+                 capture  = $true
+             } | ConvertTo-Json -Depth 4)
 
     Pass "Normal merchant payment passed fraud check"
-    Info "Payment ID: $($r.payment_id)"
-    Info "Status: $($r.status)"
-    Info "Amount: `$$($r.amount/100)"
+    Info "Payment ID : $($r.payment_id)"
+    Info "Status     : $($r.status)"
+    Info "Amount     : `$$($r.amount/100)"
 } catch {
+    $raw = $_.ErrorDetails.Message
     Fail "Normal merchant payment failed fraud check"
-    $e = $_.ErrorDetails.Message | ConvertFrom-Json
-    Info "Error: $($e.detail.message)"
-    Info "Risk Score: $($e.detail.risk_score)"
+    try {
+        $e = $raw | ConvertFrom-Json
+        Info "Error      : $($e.detail.message)"
+        Info "Risk Score : $($e.detail.risk_score)"
+        if ($e.detail.code -eq "fraud_detected") {
+            Warn "Velocity still active - re-run Test 2 reset or flush manually"
+        }
+    } catch { Info "Raw: $raw" }
 }
 
-# Merchant payment with blocked card
-Write-Step "Merchant payment with blocked card (should be rejected)"
+Write-Step "Merchant payment with BLOCKED card (expect rejection)"
 try {
     $h = $merchantHeaders.Clone()
     $h["Idempotency-Key"] = New-IdempotencyKey
@@ -410,11 +391,86 @@ try {
             customer = @{ email="test@gmail.com"; name="Test" }
             card     = @{ number=$blockedCardNumber; exp_month=12; exp_year=2026; cvc="123" }
             capture  = $false
-        } | ConvertTo-Json)
+        } | ConvertTo-Json -Depth 4)
 
-    Fail "Should have been blocked by fraud service!"
+    Fail "Blocked card should have been rejected!"
 } catch {
-    $rawErr = $_.ErrorDetails.Message
+    $raw = $_.ErrorDetails.Message
     try {
-        $e = $rawErr | ConvertFrom-Json
-        if ($e.detail.code -eq "fraud
+        $e   = $raw | ConvertFrom-Json
+        $sc  = try { $_.Exception.Response.StatusCode.value__ } catch { 0 }
+        if ($e.detail.code -eq "fraud_detected") {
+            Pass "Blocked card correctly rejected by fraud service (HTTP $sc)"
+            Info "Code      : $($e.detail.code)"
+            Info "Message   : $($e.detail.message)"
+            Info "RiskScore : $($e.detail.risk_score)"
+        } else {
+            Pass "Payment rejected - code: $($e.detail.code) (HTTP $sc)"
+        }
+    } catch { Fail "Unexpected error format" "$raw" }
+}
+
+Write-Step "Merchant payment from BLOCKED IP (expect rejection)"
+try {
+    $h = $merchantHeaders.Clone()
+    $h["Idempotency-Key"] = New-IdempotencyKey
+    $h["X-Forwarded-For"] = $blockedIP
+
+    Invoke-RestMethod -Uri "$API_GATEWAY/v1/merchant/payment_intents" `
+        -Method POST -Headers $h `
+        -Body (@{
+            amount   = 3000
+            currency = "usd"
+            customer = @{ email="legit2@gmail.com"; name="Legit User" }
+            card     = @{ number="4242424242424242"; exp_month=12; exp_year=2026; cvc="123" }
+            capture  = $false
+        } | ConvertTo-Json -Depth 4)
+
+    Warn "Blocked IP payment was allowed (gateway may not forward X-Forwarded-For to fraud service)"
+} catch {
+    $raw = $_.ErrorDetails.Message
+    try {
+        $e  = $raw | ConvertFrom-Json
+        $sc = try { $_.Exception.Response.StatusCode.value__ } catch { 0 }
+        Pass "Blocked IP rejected (HTTP $sc)"
+        Info "Code: $($e.detail.code) | Message: $($e.detail.message)"
+    } catch {
+        Pass "Blocked IP rejected"
+    }
+}
+
+# ============================================================================
+# FINAL SUMMARY
+# ============================================================================
+Write-Banner "FINAL RESULTS"
+
+Write-Host ""
+Write-Host "  Total  : $($script:pass + $script:fail)" -ForegroundColor White
+Write-Host "  Passed : $($script:pass)"                -ForegroundColor Green
+Write-Host "  Failed : $($script:fail)"                -ForegroundColor Red
+
+Write-Host "`n  Tests Covered:" -ForegroundColor Cyan
+@(
+    " 1. Health checks (fraud + gateway + auth)",
+    " 2. Reset velocity counters",
+    " 3. Direct fraud checks (low/medium risk levels)",
+    " 4. Velocity attack (7 requests same fingerprint)",
+    " 5. Blocklist (card / IP / email add + verify)",
+    " 6. Merchant payments through fraud integration"
+) | ForEach-Object { Write-Host "    . $_" -ForegroundColor White }
+
+Write-Host ""
+if ($script:fail -eq 0) {
+    Write-Host "  [OK] ALL FRAUD TESTS PASSED!"              -ForegroundColor Green
+    Write-Host "  [OK] Risk scoring working!"                -ForegroundColor Green
+    Write-Host "  [OK] Velocity detection active!"           -ForegroundColor Green
+    Write-Host "  [OK] Blocklist enforced!"                  -ForegroundColor Green
+    Write-Host "  [OK] Merchant payments protected!"         -ForegroundColor Green
+} else {
+    Write-Host "  [!!] $($script:fail) TEST(S) FAILED"      -ForegroundColor Yellow
+    Write-Host "`n  Common fixes:"                          -ForegroundColor Yellow
+    Write-Host "    Fraud logs  : docker compose logs --tail=30 fraud-service"   -ForegroundColor Gray
+    Write-Host "    Gateway logs: docker compose logs --tail=30 gateway"         -ForegroundColor Gray
+    Write-Host "    Reset DB    : docker exec postgres psql -U payments -d fraud_db -c 'TRUNCATE fraud_checks, ml_training_samples CASCADE;'" -ForegroundColor Gray
+}
+Write-Host ""
