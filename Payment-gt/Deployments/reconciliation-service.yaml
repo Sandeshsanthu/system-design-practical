@@ -1,0 +1,328 @@
+# filename: reconciliation-service.yaml
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: reconciliation-service
+  namespace: payment-gt
+  labels:
+    app: reconciliation-service
+    app.kubernetes.io/name: reconciliation-service
+    app.kubernetes.io/component: reconciliation
+spec:
+  selector:
+    app: reconciliation-service
+  ports:
+    - name: http
+      port: 8009
+      targetPort: http
+  type: ClusterIP
+
+---
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: reconciliation-service-canary
+  namespace: payment-gt
+  labels:
+    app: reconciliation-service
+    track: canary
+spec:
+  selector:
+    app: reconciliation-service
+    track: canary
+  ports:
+    - name: http
+      port: 8009
+      targetPort: http
+  type: ClusterIP
+
+---
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: reconciliation-service-stable
+  namespace: payment-gt
+  labels:
+    app: reconciliation-service
+    track: stable
+    app.kubernetes.io/name: reconciliation-service
+  annotations:
+    kubernetes.io/change-cause: "stable — reconciliation-service 609d4e9a — secrets from SM"
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: reconciliation-service
+      track: stable
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  template:
+    metadata:
+      labels:
+        app: reconciliation-service
+        track: stable
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8009"
+        prometheus.io/path: "/metrics"
+    spec:
+      terminationGracePeriodSeconds: 120   # full EOD batch run can take ~100s
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        fsGroup: 2000
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: kubernetes.io/hostname
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector:
+            matchLabels:
+              app: reconciliation-service
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              podAffinityTerm:
+                labelSelector:
+                  matchLabels:
+                    app: reconciliation-service
+                topologyKey: kubernetes.io/hostname
+      containers:
+        - name: reconciliation-service
+          image: sandeshs/payment-gt-reconciliation-service:609d4e9a23c36b8f609f342bed43c26e4e8a562f
+          imagePullPolicy: Always
+          ports:
+            - name: http
+              containerPort: 8009
+          envFrom:
+            - configMapRef:
+                name: payment-gt-config
+            - secretRef:
+                name: payment-gt-secret     # injects SECRET_KEY and any future app secrets
+          env:
+            - name: PORT
+              value: "8009"
+            # Upstream service URLs — plain values, not secrets
+            - name: GATEWAY_URL
+              value: "http://gateway:8080"
+            - name: LEDGER_URL
+              value: "http://ledger-service:8007"
+            - name: BANK_URL
+              value: "http://bank-connector-service:8005"
+            - name: MERCHANT_URL
+              value: "http://merchant-service:8001"
+            - name: NOTIFICATION_URL
+              value: "http://notification-service:8008"
+            # EOD batch config
+            - name: EOD_HOUR
+              value: "23"
+            - name: EOD_MINUTE
+              value: "0"
+            - name: EOD_TIMEZONE
+              value: "America/New_York"
+            - name: RECON_LIMIT
+              value: "500"
+          resources:
+            requests:
+              cpu: "200m"
+              memory: "256Mi"
+            limits:
+              cpu: "600m"
+              memory: "512Mi"
+          startupProbe:
+            httpGet:
+              path: /health
+              port: http
+            periodSeconds: 5
+            failureThreshold: 24
+            timeoutSeconds: 3
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: http
+            periodSeconds: 10
+            failureThreshold: 3
+            timeoutSeconds: 5
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: http
+            periodSeconds: 5
+            failureThreshold: 3
+            timeoutSeconds: 5
+
+---
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: reconciliation-service-canary
+  namespace: payment-gt
+  labels:
+    app: reconciliation-service
+    track: canary
+    app.kubernetes.io/name: reconciliation-service
+  annotations:
+    kubernetes.io/change-cause: "canary — reconciliation-service 609d4e9a — secrets from SM"
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: reconciliation-service
+      track: canary
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  template:
+    metadata:
+      labels:
+        app: reconciliation-service
+        track: canary
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8009"
+        prometheus.io/path: "/metrics"
+    spec:
+      terminationGracePeriodSeconds: 120
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        fsGroup: 2000
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              podAffinityTerm:
+                labelSelector:
+                  matchLabels:
+                    app: reconciliation-service
+                topologyKey: kubernetes.io/hostname
+      containers:
+        - name: reconciliation-service
+          image: sandeshs/payment-gt-reconciliation-service:609d4e9a23c36b8f609f342bed43c26e4e8a562f
+          imagePullPolicy: Always
+          ports:
+            - name: http
+              containerPort: 8009
+          envFrom:
+            - configMapRef:
+                name: payment-gt-config
+            - secretRef:
+                name: payment-gt-secret
+          env:
+            - name: PORT
+              value: "8009"
+            - name: CANARY
+              value: "true"
+            - name: GATEWAY_URL
+              value: "http://gateway:8080"
+            - name: LEDGER_URL
+              value: "http://ledger-service:8007"
+            - name: BANK_URL
+              value: "http://bank-connector-service:8005"
+            - name: MERCHANT_URL
+              value: "http://merchant-service:8001"
+            - name: NOTIFICATION_URL
+              value: "http://notification-service:8008"
+            - name: EOD_HOUR
+              value: "23"
+            - name: EOD_MINUTE
+              value: "0"
+            - name: EOD_TIMEZONE
+              value: "America/New_York"
+            - name: RECON_LIMIT
+              value: "500"
+          resources:
+            requests:
+              cpu: "200m"
+              memory: "256Mi"
+            limits:
+              cpu: "600m"
+              memory: "512Mi"
+          startupProbe:
+            httpGet:
+              path: /health
+              port: http
+            periodSeconds: 5
+            failureThreshold: 24
+            timeoutSeconds: 3
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: http
+            periodSeconds: 10
+            failureThreshold: 3
+            timeoutSeconds: 5
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: http
+            periodSeconds: 5
+            failureThreshold: 3
+            timeoutSeconds: 5
+
+---
+
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: reconciliation-service-stable-hpa
+  namespace: payment-gt
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: reconciliation-service-stable
+  minReplicas: 1
+  maxReplicas: 4
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 75
+    - type: Resource
+      resource:
+        name: memory
+        target:
+          type: Utilization
+          averageUtilization: 80
+  behavior:
+    scaleUp:
+      stabilizationWindowSeconds: 60
+      policies:
+        - type: Pods
+          value: 1
+          periodSeconds: 60
+    scaleDown:
+      stabilizationWindowSeconds: 600     # never evict during EOD run
+      policies:
+        - type: Pods
+          value: 1
+          periodSeconds: 180
+
+---
+
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: reconciliation-service-pdb
+  namespace: payment-gt
+  labels:
+    app: reconciliation-service
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app: reconciliation-service
+      track: stable
+

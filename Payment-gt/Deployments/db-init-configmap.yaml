@@ -1,0 +1,83 @@
+# filename: db-init-configmap.yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: db-init-sql
+  namespace: payment-gt
+data:
+  init.sql: |
+    -- ── Create Role (idempotent) ──────────────────────────────────────────
+    DO $$
+    BEGIN
+      IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'payments') THEN
+        EXECUTE format(
+          'CREATE ROLE payments WITH LOGIN PASSWORD %L',
+          'PAYMENTS_PASSWORD_PLACEHOLDER'
+        );
+        RAISE NOTICE 'Role payments created.';
+      ELSE
+        EXECUTE format(
+          'ALTER ROLE payments WITH PASSWORD %L',
+          'PAYMENTS_PASSWORD_PLACEHOLDER'
+        );
+        RAISE NOTICE 'Role payments already exists — password synced.';
+      END IF;
+    END
+    $$;
+
+    -- ── Create Databases (idempotent) ─────────────────────────────────────
+    SELECT 'CREATE DATABASE gateway_db'
+      WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = 'gateway_db')\gexec
+    SELECT 'CREATE DATABASE customer_db'
+      WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = 'customer_db')\gexec
+    SELECT 'CREATE DATABASE payment_db'
+      WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = 'payment_db')\gexec
+    SELECT 'CREATE DATABASE fraud_db'
+      WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = 'fraud_db')\gexec
+    SELECT 'CREATE DATABASE bank_connector_db'
+      WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = 'bank_connector_db')\gexec
+    SELECT 'CREATE DATABASE ledger_db'
+      WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = 'ledger_db')\gexec
+    SELECT 'CREATE DATABASE notification_db'
+      WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = 'notification_db')\gexec
+
+    -- ── Grant DB-level Privileges ─────────────────────────────────────────
+    GRANT ALL PRIVILEGES ON DATABASE gateway_db        TO payments;
+    GRANT ALL PRIVILEGES ON DATABASE customer_db       TO payments;
+    GRANT ALL PRIVILEGES ON DATABASE payment_db        TO payments;
+    GRANT ALL PRIVILEGES ON DATABASE fraud_db          TO payments;
+    GRANT ALL PRIVILEGES ON DATABASE bank_connector_db TO payments;
+    GRANT ALL PRIVILEGES ON DATABASE ledger_db         TO payments;
+    GRANT ALL PRIVILEGES ON DATABASE notification_db   TO payments;
+
+  grant-schemas.sql: |
+    -- ── Grant public schema privileges (run per-database) ────────────────
+    -- PostgreSQL 15+ revokes CREATE on public schema from PUBLIC by default
+    GRANT ALL ON SCHEMA public TO payments;
+    ALTER DEFAULT PRIVILEGES IN SCHEMA public
+      GRANT ALL ON TABLES TO payments;
+    ALTER DEFAULT PRIVILEGES IN SCHEMA public
+      GRANT ALL ON SEQUENCES TO payments;
+
+  verify.sql: |
+    \echo '────────────────────────────────────────'
+    \echo '  Roles Check'
+    \echo '────────────────────────────────────────'
+    SELECT rolname, rolcanlogin, rolcreatedb FROM pg_roles
+    WHERE rolname IN ('dbadmin','payments');
+
+    \echo '────────────────────────────────────────'
+    \echo '  Databases Check'
+    \echo '────────────────────────────────────────'
+    SELECT datname AS database,
+           CASE WHEN datname IN (
+             'gateway_db','customer_db','payment_db',
+             'fraud_db','bank_connector_db','ledger_db','notification_db'
+           ) THEN '✅ EXISTS' ELSE '➡ other' END AS status
+    FROM pg_database ORDER BY datname;
+
+    \echo '────────────────────────────────────────'
+    \echo '  Privileges for payments role'
+    \echo '────────────────────────────────────────'
+    SELECT datname AS database, datacl AS access_control
+    FROM pg_database WHERE datname NOT IN ('rdsadmin','template0','template1');

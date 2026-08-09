@@ -1,0 +1,88 @@
+# filename: db-init-job.yaml
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: db-init
+  namespace: payment-gt
+  annotations:
+    run-version: "5"
+spec:
+  ttlSecondsAfterFinished: 300
+  backoffLimit: 3
+  template:
+    spec:
+      restartPolicy: OnFailure
+      containers:
+        - name: db-init
+          image: postgres:16-alpine
+          command: ["/bin/sh", "-c"]
+          args:
+            - |
+              echo "▶ Substituting PAYMENTS_PASSWORD_PLACEHOLDER..."
+              sed "s/PAYMENTS_PASSWORD_PLACEHOLDER/${PAYMENTS_PASSWORD}/g" \
+                /sql/init.sql > /tmp/init-resolved.sql
+
+              echo "▶ Verifying substitution..."
+              if grep -q "PAYMENTS_PASSWORD_PLACEHOLDER" /tmp/init-resolved.sql; then
+                echo "❌ FATAL: placeholder still present"
+                exit 1
+              fi
+              echo "✅ Substitution confirmed."
+
+              export PGPASSWORD="${DB_PASSWORD}"
+              export PGHOST="${DB_HOST}"
+              export PGPORT="${DB_PORT}"
+              export PGUSER="${DB_USERNAME}"
+              export PGSSLMODE="require"
+
+              echo "▶ Running init.sql..."
+              psql -d payment_gateway --echo-all -f /tmp/init-resolved.sql
+              echo "✅ init.sql completed."
+
+              echo "▶ Granting public schema privileges per database..."
+              for DB in gateway_db customer_db payment_db fraud_db bank_connector_db ledger_db notification_db; do
+                echo "  → schema grants on ${DB}..."
+                psql -d "${DB}" -f /sql/grant-schemas.sql
+              done
+              echo "✅ Schema grants complete."
+
+              echo "▶ Running verify.sql..."
+              psql -d payment_gateway -f /sql/verify.sql
+              echo "✅ DB init complete."
+
+          env:
+            - name: DB_HOST
+              valueFrom:
+                secretKeyRef:
+                  name: payment-gt-db-secret
+                  key: host
+            - name: DB_PORT
+              valueFrom:
+                secretKeyRef:
+                  name: payment-gt-db-secret
+                  key: port
+            - name: DB_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: payment-gt-db-secret
+                  key: username
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: payment-gt-db-secret
+                  key: password
+            - name: PAYMENTS_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: payment-gt-db-secret
+                  key: payments_password
+
+          volumeMounts:
+            - name: sql-scripts
+              mountPath: /sql
+              readOnly: true
+
+      volumes:
+        - name: sql-scripts
+          configMap:
+            name: db-init-sql

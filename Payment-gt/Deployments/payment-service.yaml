@@ -1,0 +1,347 @@
+# filename: 06-payment-service.yaml
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: payment-service
+  namespace: payment-gt
+  labels:
+    app: payment-service
+spec:
+  selector:
+    app: payment-service
+  ports:
+    - name: http
+      port: 8003
+      targetPort: 8003
+  type: ClusterIP
+
+---
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: payment-service-canary
+  namespace: payment-gt
+  labels:
+    app: payment-service
+    track: canary
+spec:
+  selector:
+    app: payment-service
+    track: canary
+  ports:
+    - name: http
+      port: 8003
+      targetPort: 8003
+  type: ClusterIP
+
+---
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: payment-service-stable
+  namespace: payment-gt
+  labels:
+    app: payment-service
+    track: stable
+  annotations:
+    kubernetes.io/change-cause: "stable — payment-service 609d4e9a — secrets from SM"
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: payment-service
+      track: stable
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 1
+  template:
+    metadata:
+      labels:
+        app: payment-service
+        track: stable
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8003"
+        prometheus.io/path: "/metrics"
+    spec:
+      terminationGracePeriodSeconds: 30
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        fsGroup: 2000
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              podAffinityTerm:
+                labelSelector:
+                  matchLabels:
+                    app: payment-service
+                topologyKey: kubernetes.io/hostname
+      containers:
+        - name: payment-service
+          image: sandeshs/payment-gt-payment-service:609d4e9a23c36b8f609f342bed43c26e4e8a562f
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 8003
+          envFrom:
+            - configMapRef:
+                name: payment-gt-config
+            - secretRef:
+                name: payment-gt-secret     # injects REDIS_URL, STRIPE_*, KEY_HASH_PEPPER
+          env:
+            - name: PORT
+              value: "8003"
+            # Pre-encoded connection URL from SM — no runtime string construction
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: payment-gt-secret
+                  key: PAYMENT_DATABASE_URL
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: payment-gt-db-secret
+                  key: payments_password
+            # OpenSearch — separate secret, must stay as individual refs
+            - name: ELASTICSEARCH_URL
+              valueFrom:
+                secretKeyRef:
+                  name: payment-gt-opensearch-secret
+                  key: endpoint
+            - name: ELASTICSEARCH_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: payment-gt-opensearch-secret
+                  key: username
+            - name: ELASTICSEARCH_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: payment-gt-opensearch-secret
+                  key: password
+            - name: ELASTICSEARCH_INDEX_PREFIX
+              value: "payment-gt"
+            # Downstream service URLs — plain values, not secrets
+            - name: FRAUD_SERVICE_URL
+              value: "http://fraud-service:8004"
+            - name: BANK_CONNECTOR_URL
+              value: "http://bank-connector-service:8005"
+            - name: LEDGER_SERVICE_URL
+              value: "http://ledger-service:8007"
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "128Mi"
+            limits:
+              cpu: "400m"
+              memory: "256Mi"
+          startupProbe:
+            httpGet:
+              path: /health
+              port: 8003
+            initialDelaySeconds: 5
+            periodSeconds: 2
+            failureThreshold: 30
+            timeoutSeconds: 3
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8003
+            periodSeconds: 20
+            failureThreshold: 3
+            timeoutSeconds: 5
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8003
+            periodSeconds: 10
+            failureThreshold: 3
+            successThreshold: 2
+            timeoutSeconds: 5
+          lifecycle:
+            preStop:
+              exec:
+                command: ["/bin/sh", "-c", "sleep 5"]
+
+---
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: payment-service-canary
+  namespace: payment-gt
+  labels:
+    app: payment-service
+    track: canary
+  annotations:
+    kubernetes.io/change-cause: "canary — payment-service 609d4e9a — secrets from SM"
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: payment-service
+      track: canary
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 1
+  template:
+    metadata:
+      labels:
+        app: payment-service
+        track: canary
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8003"
+        prometheus.io/path: "/metrics"
+    spec:
+      terminationGracePeriodSeconds: 30
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        fsGroup: 2000
+      containers:
+        - name: payment-service
+          image: sandeshs/payment-gt-payment-service:609d4e9a23c36b8f609f342bed43c26e4e8a562f
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 8003
+          envFrom:
+            - configMapRef:
+                name: payment-gt-config
+            - secretRef:
+                name: payment-gt-secret
+          env:
+            - name: PORT
+              value: "8003"
+            - name: CANARY
+              value: "true"
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: payment-gt-secret
+                  key: PAYMENT_DATABASE_URL
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: payment-gt-db-secret
+                  key: payments_password
+            - name: ELASTICSEARCH_URL
+              valueFrom:
+                secretKeyRef:
+                  name: payment-gt-opensearch-secret
+                  key: endpoint
+            - name: ELASTICSEARCH_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: payment-gt-opensearch-secret
+                  key: username
+            - name: ELASTICSEARCH_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: payment-gt-opensearch-secret
+                  key: password
+            - name: ELASTICSEARCH_INDEX_PREFIX
+              value: "payment-gt"
+            - name: FRAUD_SERVICE_URL
+              value: "http://fraud-service:8004"
+            - name: BANK_CONNECTOR_URL
+              value: "http://bank-connector-service:8005"
+            - name: LEDGER_SERVICE_URL
+              value: "http://ledger-service:8007"
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "128Mi"
+            limits:
+              cpu: "400m"
+              memory: "256Mi"
+          startupProbe:
+            httpGet:
+              path: /health
+              port: 8003
+            initialDelaySeconds: 5
+            periodSeconds: 2
+            failureThreshold: 30
+            timeoutSeconds: 3
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8003
+            periodSeconds: 20
+            failureThreshold: 3
+            timeoutSeconds: 5
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8003
+            periodSeconds: 10
+            failureThreshold: 3
+            successThreshold: 2
+            timeoutSeconds: 5
+          lifecycle:
+            preStop:
+              exec:
+                command: ["/bin/sh", "-c", "sleep 5"]
+
+---
+
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: payment-service-hpa
+  namespace: payment-gt
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: payment-service-stable
+  minReplicas: 1
+  maxReplicas: 4
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 60
+    - type: Resource
+      resource:
+        name: memory
+        target:
+          type: Utilization
+          averageUtilization: 80
+  behavior:
+    scaleUp:
+      stabilizationWindowSeconds: 30
+      policies:
+        - type: Pods
+          value: 1
+          periodSeconds: 30
+    scaleDown:
+      stabilizationWindowSeconds: 180
+      policies:
+        - type: Pods
+          value: 1
+          periodSeconds: 120
+
+---
+
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: payment-service-pdb
+  namespace: payment-gt
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app: payment-service
+      track: stable
+

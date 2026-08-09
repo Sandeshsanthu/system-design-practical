@@ -1,0 +1,338 @@
+# filename: merchant-service.yaml
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: merchant-service
+  namespace: payment-gt
+  labels:
+    app: merchant-service
+    app.kubernetes.io/name: merchant-service
+    app.kubernetes.io/component: merchant
+spec:
+  selector:
+    app: merchant-service
+  ports:
+    - name: http
+      protocol: TCP
+      port: 8001
+      targetPort: 8001
+  type: ClusterIP
+
+---
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: merchant-service-canary
+  namespace: payment-gt
+  labels:
+    app: merchant-service
+    track: canary
+spec:
+  selector:
+    app: merchant-service
+    track: canary
+  ports:
+    - name: http
+      protocol: TCP
+      port: 8001
+      targetPort: 8001
+  type: ClusterIP
+
+---
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: merchant-service-stable
+  namespace: payment-gt
+  labels:
+    app: merchant-service
+    track: stable
+    app.kubernetes.io/name: merchant-service
+  annotations:
+    kubernetes.io/change-cause: "stable — merchant-service 609d4e9a — secrets from SM"
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: merchant-service
+      track: stable
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 1
+  template:
+    metadata:
+      labels:
+        app: merchant-service
+        track: stable
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8001"
+        prometheus.io/path: "/metrics"
+    spec:
+      terminationGracePeriodSeconds: 30
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        fsGroup: 2000
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: kubernetes.io/hostname
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector:
+            matchLabels:
+              app: merchant-service
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              podAffinityTerm:
+                labelSelector:
+                  matchLabels:
+                    app: merchant-service
+                topologyKey: kubernetes.io/hostname
+      containers:
+        - name: merchant-service
+          image: sandeshs/payment-gt-merchant-service:609d4e9a23c36b8f609f342bed43c26e4e8a562f
+          imagePullPolicy: Always
+          ports:
+            - name: http
+              containerPort: 8001
+              protocol: TCP
+          envFrom:
+            - configMapRef:
+                name: payment-gt-config
+            - secretRef:
+                name: payment-gt-secret     # injects KEY_HASH_PEPPER, REDIS_URL, STRIPE_*
+          env:
+            - name: PORT
+              value: "8001"
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: payment-gt-secret
+                  key: MERCHANT_DATABASE_URL
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: payment-gt-db-secret
+                  key: payments_password
+          resources:
+            requests:
+              cpu: "75m"
+              memory: "128Mi"
+            limits:
+              cpu: "300m"
+              memory: "256Mi"
+          startupProbe:
+            httpGet:
+              path: /health
+              port: 8001
+            initialDelaySeconds: 5
+            periodSeconds: 2
+            failureThreshold: 30
+            successThreshold: 1
+            timeoutSeconds: 3
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8001
+            periodSeconds: 20
+            failureThreshold: 3
+            successThreshold: 1
+            timeoutSeconds: 5
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8001
+            periodSeconds: 10
+            failureThreshold: 3
+            successThreshold: 2
+            timeoutSeconds: 5
+          lifecycle:
+            preStop:
+              exec:
+                command: ["/bin/sh", "-c", "sleep 5"]
+
+---
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: merchant-service-canary
+  namespace: payment-gt
+  labels:
+    app: merchant-service
+    track: canary
+    app.kubernetes.io/name: merchant-service
+  annotations:
+    kubernetes.io/change-cause: "canary — merchant-service 609d4e9a — secrets from SM"
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: merchant-service
+      track: canary
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 1
+  template:
+    metadata:
+      labels:
+        app: merchant-service
+        track: canary
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8001"
+        prometheus.io/path: "/metrics"
+    spec:
+      terminationGracePeriodSeconds: 30
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        fsGroup: 2000
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: kubernetes.io/hostname
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector:
+            matchLabels:
+              app: merchant-service
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              podAffinityTerm:
+                labelSelector:
+                  matchLabels:
+                    app: merchant-service
+                topologyKey: kubernetes.io/hostname
+      containers:
+        - name: merchant-service
+          image: sandeshs/payment-gt-merchant-service:609d4e9a23c36b8f609f342bed43c26e4e8a562f
+          imagePullPolicy: Always
+          ports:
+            - name: http
+              containerPort: 8001
+          envFrom:
+            - configMapRef:
+                name: payment-gt-config
+            - secretRef:
+                name: payment-gt-secret
+          env:
+            - name: PORT
+              value: "8001"
+            - name: CANARY
+              value: "true"
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: payment-gt-secret
+                  key: MERCHANT_DATABASE_URL
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: payment-gt-db-secret
+                  key: payments_password
+          resources:
+            requests:
+              cpu: "75m"
+              memory: "128Mi"
+            limits:
+              cpu: "300m"
+              memory: "256Mi"
+          startupProbe:
+            httpGet:
+              path: /health
+              port: 8001
+            initialDelaySeconds: 5
+            periodSeconds: 2
+            failureThreshold: 30
+            successThreshold: 1
+            timeoutSeconds: 3
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8001
+            periodSeconds: 20
+            failureThreshold: 3
+            successThreshold: 1
+            timeoutSeconds: 5
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8001
+            periodSeconds: 10
+            failureThreshold: 3
+            successThreshold: 2
+            timeoutSeconds: 5
+          lifecycle:
+            preStop:
+              exec:
+                command: ["/bin/sh", "-c", "sleep 5"]
+
+---
+
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: merchant-service-hpa
+  namespace: payment-gt
+  labels:
+    app: merchant-service
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: merchant-service-stable
+  minReplicas: 1
+  maxReplicas: 3
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 65
+    - type: Resource
+      resource:
+        name: memory
+        target:
+          type: Utilization
+          averageUtilization: 80
+  behavior:
+    scaleUp:
+      stabilizationWindowSeconds: 45
+      policies:
+        - type: Pods
+          value: 1
+          periodSeconds: 45
+    scaleDown:
+      stabilizationWindowSeconds: 180
+      policies:
+        - type: Pods
+          value: 1
+          periodSeconds: 120
+
+---
+
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: merchant-service-pdb
+  namespace: payment-gt
+  labels:
+    app: merchant-service
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app: merchant-service
+      track: stable
+

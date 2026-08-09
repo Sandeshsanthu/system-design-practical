@@ -1,0 +1,356 @@
+# filename: fraud-service.yaml
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: fraud-service
+  namespace: payment-gt
+  labels:
+    app: fraud-service
+    app.kubernetes.io/name: fraud-service
+    app.kubernetes.io/component: fraud
+spec:
+  selector:
+    app: fraud-service
+  ports:
+    - name: http
+      protocol: TCP
+      port: 8004
+      targetPort: 8004
+  type: ClusterIP
+
+---
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: fraud-service-canary
+  namespace: payment-gt
+  labels:
+    app: fraud-service
+    track: canary
+spec:
+  selector:
+    app: fraud-service
+    track: canary
+  ports:
+    - name: http
+      protocol: TCP
+      port: 8004
+      targetPort: 8004
+  type: ClusterIP
+
+---
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: fraud-service-stable
+  namespace: payment-gt
+  labels:
+    app: fraud-service
+    track: stable
+    app.kubernetes.io/name: fraud-service
+  annotations:
+    kubernetes.io/change-cause: "stable — fraud-service 609d4e9a — secrets from SM"
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: fraud-service
+      track: stable
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 1
+  template:
+    metadata:
+      labels:
+        app: fraud-service
+        track: stable
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8004"
+        prometheus.io/path: "/metrics"
+    spec:
+      terminationGracePeriodSeconds: 30
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        fsGroup: 2000
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              podAffinityTerm:
+                labelSelector:
+                  matchLabels:
+                    app: fraud-service
+                topologyKey: kubernetes.io/hostname
+      containers:
+        - name: fraud-service
+          image: sandeshs/payment-gt-fraud-service:609d4e9a23c36b8f609f342bed43c26e4e8a562f
+          imagePullPolicy: Always
+          ports:
+            - name: http
+              containerPort: 8004
+              protocol: TCP
+          envFrom:
+            - configMapRef:
+                name: payment-gt-config
+            - secretRef:
+                name: payment-gt-secret     # injects REDIS_URL, KEY_HASH_PEPPER, STRIPE_*
+          env:
+            - name: PORT
+              value: "8004"
+            # Pre-encoded URL from SM via ESO — no runtime string construction
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: payment-gt-secret
+                  key: FRAUD_DATABASE_URL
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: payment-gt-db-secret
+                  key: payments_password
+            # ── Rules-based fraud tuning (plain config, not secrets) ──────────
+            - name: LOW_RISK_THRESHOLD
+              value: "30"
+            - name: MEDIUM_RISK_THRESHOLD
+              value: "70"
+            - name: CARD_VELOCITY_WINDOW_MINUTES
+              value: "60"
+            - name: CARD_VELOCITY_MAX_ATTEMPTS
+              value: "5"
+            - name: IP_VELOCITY_WINDOW_MINUTES
+              value: "60"
+            - name: IP_VELOCITY_MAX_ATTEMPTS
+              value: "10"
+            - name: CUSTOMER_VELOCITY_WINDOW_HOURS
+              value: "24"
+            - name: CUSTOMER_VELOCITY_MAX_ATTEMPTS
+              value: "10"
+          resources:
+            requests:
+              cpu: "75m"
+              memory: "128Mi"
+            limits:
+              cpu: "300m"
+              memory: "256Mi"
+          startupProbe:
+            httpGet:
+              path: /health
+              port: 8004
+            initialDelaySeconds: 5
+            periodSeconds: 2
+            failureThreshold: 30
+            successThreshold: 1
+            timeoutSeconds: 3
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8004
+            periodSeconds: 20
+            failureThreshold: 3
+            timeoutSeconds: 5
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8004
+            periodSeconds: 10
+            failureThreshold: 3
+            successThreshold: 2
+            timeoutSeconds: 5
+          lifecycle:
+            preStop:
+              exec:
+                command: ["/bin/sh", "-c", "sleep 5"]
+
+---
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: fraud-service-canary
+  namespace: payment-gt
+  labels:
+    app: fraud-service
+    track: canary
+    app.kubernetes.io/name: fraud-service
+  annotations:
+    kubernetes.io/change-cause: "canary — fraud-service 609d4e9a — secrets from SM"
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: fraud-service
+      track: canary
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 1
+  template:
+    metadata:
+      labels:
+        app: fraud-service
+        track: canary
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8004"
+        prometheus.io/path: "/metrics"
+    spec:
+      terminationGracePeriodSeconds: 30
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        fsGroup: 2000
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              podAffinityTerm:
+                labelSelector:
+                  matchLabels:
+                    app: fraud-service
+                topologyKey: kubernetes.io/hostname
+      containers:
+        - name: fraud-service
+          image: sandeshs/payment-gt-fraud-service:609d4e9a23c36b8f609f342bed43c26e4e8a562f
+          imagePullPolicy: Always
+          ports:
+            - name: http
+              containerPort: 8004
+          envFrom:
+            - configMapRef:
+                name: payment-gt-config
+            - secretRef:
+                name: payment-gt-secret
+          env:
+            - name: PORT
+              value: "8004"
+            - name: CANARY
+              value: "true"
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: payment-gt-secret
+                  key: FRAUD_DATABASE_URL
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: payment-gt-db-secret
+                  key: payments_password
+            - name: LOW_RISK_THRESHOLD
+              value: "30"
+            - name: MEDIUM_RISK_THRESHOLD
+              value: "70"
+            - name: CARD_VELOCITY_WINDOW_MINUTES
+              value: "60"
+            - name: CARD_VELOCITY_MAX_ATTEMPTS
+              value: "5"
+            - name: IP_VELOCITY_WINDOW_MINUTES
+              value: "60"
+            - name: IP_VELOCITY_MAX_ATTEMPTS
+              value: "10"
+            - name: CUSTOMER_VELOCITY_WINDOW_HOURS
+              value: "24"
+            - name: CUSTOMER_VELOCITY_MAX_ATTEMPTS
+              value: "10"
+          resources:
+            requests:
+              cpu: "75m"
+              memory: "128Mi"
+            limits:
+              cpu: "300m"
+              memory: "256Mi"
+          startupProbe:
+            httpGet:
+              path: /health
+              port: 8004
+            initialDelaySeconds: 5
+            periodSeconds: 2
+            failureThreshold: 30
+            successThreshold: 1
+            timeoutSeconds: 3
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8004
+            periodSeconds: 20
+            failureThreshold: 3
+            timeoutSeconds: 5
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8004
+            periodSeconds: 10
+            failureThreshold: 3
+            successThreshold: 2
+            timeoutSeconds: 5
+          lifecycle:
+            preStop:
+              exec:
+                command: ["/bin/sh", "-c", "sleep 5"]
+
+---
+
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: fraud-service-hpa
+  namespace: payment-gt
+  labels:
+    app: fraud-service
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: fraud-service-stable
+  minReplicas: 1
+  maxReplicas: 3
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 65
+    - type: Resource
+      resource:
+        name: memory
+        target:
+          type: Utilization
+          averageUtilization: 80
+  behavior:
+    scaleUp:
+      stabilizationWindowSeconds: 45
+      policies:
+        - type: Pods
+          value: 1
+          periodSeconds: 45
+    scaleDown:
+      stabilizationWindowSeconds: 180
+      policies:
+        - type: Pods
+          value: 1
+          periodSeconds: 120
+
+---
+
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: fraud-service-pdb
+  namespace: payment-gt
+  labels:
+    app: fraud-service
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app: fraud-service
+      track: stable
+
