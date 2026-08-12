@@ -20,7 +20,7 @@ async def lifespan(app: FastAPI):
         db_host = DATABASE_URL.split("@")[1] if "@" in DATABASE_URL else "local"
         logger.info("Target Database Host: %s", db_host)
     except Exception: # noqa: BLE001
-        logger.info("Target Database Host: Configured via environment string")
+        logger.info("Targddddddddet Database Host: Configured via environment string")
 
     db = SessionLocal()
 
