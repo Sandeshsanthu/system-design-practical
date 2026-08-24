@@ -1,4 +1,4 @@
--- filename: init.sql
+--- filename: init.sql
 
 CREATE DATABASE gateway_db;
 CREATE DATABASE customer_db;
